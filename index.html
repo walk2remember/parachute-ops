@@ -565,6 +565,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script>
 const CFG = {
   'MC-6':{ maxBin:72, expDays:182 }, 'T-11':{ maxBin:56, expDays:182 },
@@ -5496,6 +5497,121 @@ async function pushLocalToDB(){
   }
 }
 
+
+
+// ══ BARCODE GENERATOR ══
+
+function showBarcodeGenerator(){
+  var serials=[];
+  Object.keys(S.masterInventory||{}).forEach(function(sn){
+    if(sn) serials.push({sn:sn, source:'inventory'});
+  });
+  S.sections.forEach(function(sec){
+    sec.rows.forEach(function(r){
+      if(r.serialNumber && !serials.find(function(s){return s.sn===r.serialNumber;})){
+        serials.push({sn:r.serialNumber, source:sec.systemType});
+      }
+    });
+  });
+  var dbags=[];
+  S.sections.forEach(function(sec){
+    sec.rows.forEach(function(r){
+      if(r.dbag && !dbags.find(function(d){return d.sn===r.dbag;})){
+        dbags.push({sn:r.dbag, source:'D-Bag'});
+      }
+    });
+  });
+  if(serials.length===0 && dbags.length===0){toast('No serial numbers or D-bag numbers found','warning');return;}
+  
+  var html='<div style="text-align:left;max-height:400px;overflow-y:auto;">';
+  html+='<div class="form-group"><label class="form-label">What to generate</label>';
+  html+='<select class="form-input" id="barcodeType">';
+  html+='<option value="serials">Serial Numbers ('+serials.length+')</option>';
+  if(dbags.length>0) html+='<option value="dbags">D-Bag Numbers ('+dbags.length+')</option>';
+  html+='<option value="both">All ('+(serials.length+dbags.length)+')</option>';
+  html+='</select></div>';
+  html+='<div class="form-group"><label class="form-label">Barcode Format</label>';
+  html+='<select class="form-input" id="barcodeFormat">';
+  html+='<option value="CODE128">Code 128 (recommended)</option>';
+  html+='<option value="CODE39">Code 39</option>';
+  html+='</select></div>';
+  html+='<div class="form-group"><label class="form-label">Label Size</label>';
+  html+='<select class="form-input" id="barcodeSize">';
+  html+='<option value="small">Small (30 per page - Avery 5160)</option>';
+  html+='<option value="medium">Medium (20 per page)</option>';
+  html+='<option value="large">Large (10 per page)</option>';
+  html+='</select></div>';
+  html+='<div class="form-group"><label class="form-label">Filter by Section</label>';
+  html+='<select class="form-input" id="barcodeSection">';
+  html+='<option value="">All Sections</option>';
+  S.sections.forEach(function(sec){
+    html+='<option value="'+sec.id+'">'+esc(sec.binLocation)+' ('+sec.systemType+')</option>';
+  });
+  html+='</select></div></div>';
+  
+  showConfirm('Generate Barcodes', html,
+    [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
+     {label:'Generate & Print',cls:'btn-primary',fn:function(){
+       generateBarcodes(
+         document.getElementById('barcodeType').value,
+         document.getElementById('barcodeFormat').value,
+         document.getElementById('barcodeSize').value,
+         document.getElementById('barcodeSection').value
+       );
+     }}]);
+}
+
+function generateBarcodes(type,format,size,secFilter){
+  var items=[];
+  if(type==='serials'||type==='both'){
+    if(secFilter){
+      var sec=S.sections.find(function(s){return s.id==secFilter;});
+      if(sec) sec.rows.forEach(function(r){if(r.serialNumber) items.push({value:r.serialNumber,label:r.serialNumber,type:sec.systemType});});
+    } else {
+      Object.keys(S.masterInventory||{}).forEach(function(sn){if(sn) items.push({value:sn,label:sn,type:'S/N'});});
+      S.sections.forEach(function(sec){sec.rows.forEach(function(r){
+        if(r.serialNumber&&!items.find(function(x){return x.value===r.serialNumber;})) items.push({value:r.serialNumber,label:r.serialNumber,type:sec.systemType});
+      });});
+    }
+  }
+  if(type==='dbags'||type==='both'){
+    S.sections.forEach(function(sec){
+      if(secFilter&&sec.id!=secFilter) return;
+      sec.rows.forEach(function(r){
+        if(r.dbag&&!items.find(function(x){return x.value===r.dbag;})) items.push({value:r.dbag,label:r.dbag,type:'D-Bag'});
+      });
+    });
+  }
+  if(items.length===0){toast('No items to generate','warning');return;}
+  
+  var cols,bH,bW,fs;
+  if(size==='small'){cols=3;bW=1.2;bH=40;fs=9;}
+  else if(size==='medium'){cols=2;bW=1.5;bH=50;fs=11;}
+  else{cols=2;bW=2;bH=60;fs=13;}
+  
+  var body='<style>.bc-grid{display:grid;grid-template-columns:repeat('+cols+',1fr);gap:4px;padding:10px;}.bc-cell{text-align:center;padding:4px;border:1px dashed #ccc;page-break-inside:avoid;}.bc-cell svg{display:block;margin:0 auto;}.bc-lbl{font-size:'+fs+'px;font-weight:600;margin-top:2px;color:#111 !important;}.bc-type{font-size:'+(fs-2)+'px;color:#666 !important;}</style>';
+  body+='<h1 style="font-size:16px;margin-bottom:4px;">Barcode Labels</h1>';
+  body+='<div class="header-info">'+items.length+' labels \u00b7 Format: '+format+' \u00b7 Generated: '+new Date().toLocaleDateString()+'</div>';
+  body+='<div class="bc-grid">';
+  items.forEach(function(item,idx){
+    body+='<div class="bc-cell"><svg id="bc-'+idx+'"></svg><div class="bc-lbl">'+esc(item.label)+'</div><div class="bc-type">'+esc(item.type)+'</div></div>';
+  });
+  body+='</div>';
+  
+  openPrintPreview('Barcode Labels', body);
+  
+  setTimeout(function(){
+    var pc=document.querySelector('.print-content');
+    if(!pc) return;
+    items.forEach(function(item,idx){
+      var svg=pc.querySelector('#bc-'+idx);
+      if(svg&&window.JsBarcode){
+        try{JsBarcode(svg,item.value,{format:format,width:bW,height:bH,displayValue:false,margin:2});}
+        catch(e){svg.outerHTML='<span style="color:red;font-size:10px;">Invalid: '+esc(item.value)+'</span>';}
+      }
+    });
+  },500);
+}
 
 // ══ TAB NAVIGATION ══
 document.addEventListener('keydown',function(e){
