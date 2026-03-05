@@ -1651,13 +1651,17 @@ function updateUserDisplay(){
     // Check if role was changed by admin
     var users=getUsers();
     var me=users.find(function(u){return u.name===currentUser.name;});
-    if(me&&me.role!==currentUser.role){
+    if(!me){
+      // Account was deleted
+      toast('Your account has been removed. Logging out...','error',5000);
+      setTimeout(function(){doLogout();},2000);
+      return;
+    }
+    if(me.role!==currentUser.role){
       var newRole=me.role;
       var dispNew=newRole==='masteradmin'?'admin':newRole;
-      currentUser.role=newRole;
-      sessionStorage.setItem('pms_session',JSON.stringify(currentUser));
       toast('Your role has been changed to '+dispNew+'. Logging out...','warning',5000);
-      setTimeout(function(){doLogout();},3000);
+      setTimeout(function(){doLogout();},2000);
       return;
     }
     el.innerHTML='<span class="user-pill role-'+currentUser.role+'">'+esc(currentUser.lastName||currentUser.name)+'</span>';
@@ -1669,6 +1673,22 @@ function updateUserDisplay(){
     }
   });
 }
+
+// Check for role/account changes every 5 seconds
+setInterval(function(){
+  if(!currentUser) return;
+  // Sync users from DB if connected
+  if(sbClient && dbReady){
+    getUsersDB().then(function(dbUsers){
+      if(dbUsers && dbUsers.length>0){
+        localStorage.setItem('pms_users', JSON.stringify(dbUsers));
+        updateUserDisplay();
+      }
+    }).catch(function(){});
+  } else {
+    updateUserDisplay();
+  }
+}, 5000);
 function hasRole(minRole){
   if(!currentUser) return false;
   var roles={masteradmin:4,admin:3,rigger:2,viewer:1};
