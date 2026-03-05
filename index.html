@@ -1922,12 +1922,13 @@ function renderUnifiedBar(){
         +' <button class="tracker-del-btn" onclick="removeEquipSystem(\''+eq+"','"+sys+'\')" title="Remove">\u2715</button>'
         +'</div>'+rows+'</div>';
     });
-    var remaining=systems.filter(function(s){return addedSystems.indexOf(s)<0;});
+    var eqSelf=[eq];
+    var hasIt=addedSystems.indexOf(eq)>=0;
     var dd='';
-    if(remaining.length>0){
+    if(!hasIt){
       dd='<select class="tracker-input" style="width:auto;margin-top:4px;font-size:10px;padding:3px 6px;color:var(--accent);font-weight:600;cursor:pointer;" onchange="addEquipSystem(\''+eq+"',this.value);this.value=''"+'">';
-      dd+='<option value="">+ Add system</option>';
-      remaining.forEach(function(sys){dd+='<option value="'+sys+'">'+sys+'</option>';});
+      dd+='<option value="">+ Add '+eq+'</option>';
+      dd+='<option value="'+eq+'">'+eq+'</option>';
       dd+='</select>';
     }
     html+='<div class="tracker-col"><div class="tracker-col-title">'+eq+'</div><div class="tracker-cards">'+colContent+'</div>'+dd+'</div>';
@@ -2356,16 +2357,17 @@ function rowHTML(sec,r,i){
   else if(osdStatus==='yellow') rowStyle='background:rgba(217,119,6,0.12);';
   const osdDisplay=r.osd||calcOSDString(r.dom,r.pis)||'—';
   const osdColor=osdStatus==='red'?'color:#dc2626;font-weight:700;':osdStatus==='yellow'?'color:#d97706;font-weight:700;':'';
+  var ti=i*8+1;
   return `<tr class="${locked?'row-locked':''}" style="${rowStyle}">
     <td><input type="checkbox" class="row-cb" data-sec="${sec.id}" data-ri="${i}"></td>
-    <td><input type="text" value="${esc(r.serialNumber)}" placeholder="S/N" onchange="onSN(${sec.id},${i},this.value)" ${dis}></td>
-    <td><input type="text" value="${esc(r.dom)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'dom')" onkeydown="onDateKey(event,this,${sec.id},${i},'dom')" style="width:65px;" ${dis}></td>
-    <td><input type="text" value="${esc(r.pis)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'pis')" onkeydown="onDateKey(event,this,${sec.id},${i},'pis')" style="width:65px;" ${dis}></td>
+    <td><input type="text" value="${esc(r.serialNumber)}" placeholder="S/N" onchange="onSN(${sec.id},${i},this.value)" tabindex="${ti}" ${dis}></td>
+    <td><input type="text" value="${esc(r.dom)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'dom')" onkeydown="onDateKey(event,this,${sec.id},${i},'dom')" style="width:65px;" tabindex="${ti+1}" ${dis}></td>
+    <td><input type="text" value="${esc(r.pis)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'pis')" onkeydown="onDateKey(event,this,${sec.id},${i},'pis')" style="width:65px;" tabindex="${ti+2}" ${dis}></td>
     <td><span class="cell-readonly" style="${osdColor}">${osdDisplay}</span></td>
-    <td><input type="text" value="${esc(r.dbag)}" placeholder="D-Bag" onchange="upd(${sec.id},${i},'dbag',this.value)" ${dis}></td>
-    <td><input type="text" list="packer-list" value="${esc(r.packer)}" placeholder="Packer" onchange="onPkr(${sec.id},${i},this.value,this)" ${dis}></td>
-    <td><input type="text" list="ip-list" value="${esc(r.ip)}" placeholder="IP" onchange="onIP(${sec.id},${i},this.value,this)" ${dis}></td>
-    <td><input type="date" value="${r.packDate||''}" onchange="upd(${sec.id},${i},'packDate',this.value)" style="width:115px;" ${dis}></td>
+    <td><input type="text" value="${esc(r.dbag)}" placeholder="D-Bag" onchange="upd(${sec.id},${i},'dbag',this.value)" tabindex="${ti+3}" ${dis}></td>
+    <td><input type="text" list="packer-list" value="${esc(r.packer)}" placeholder="Packer" onchange="onPkr(${sec.id},${i},this.value,this)" tabindex="${ti+4}" ${dis}></td>
+    <td><input type="text" list="ip-list" value="${esc(r.ip)}" placeholder="IP" onchange="onIP(${sec.id},${i},this.value,this)" tabindex="${ti+5}" ${dis}></td>
+    <td><input type="date" value="${r.packDate||''}" onchange="upd(${sec.id},${i},'packDate',this.value)" style="width:115px;" tabindex="${ti+6}" ${dis}></td>
     <td><div class="row-actions">
       <button class="row-action-btn" onclick="toggleLock(${sec.id},${i})" title="${locked?'Unlock to edit':'Lock row'}">${locked?'🔒':'✏️'}</button>
       <button class="row-action-btn delete" onclick="delRow(${sec.id},${i})" title="Delete">🗑</button>
@@ -2650,11 +2652,10 @@ function bulkFill(secId){
     <div style="text-align:left;">
       <div class="form-group"><label class="form-label">Packer (blank=skip)</label><input type="text" class="form-input" id="bPkr" list="packer-list"></div>
       <div class="form-group"><label class="form-label">IP (blank=skip)</label><input type="text" class="form-input" id="bIP" list="ip-list"></div>
-      <div class="form-group"><label class="form-label">D-Bag # (blank=skip)</label><input type="text" class="form-input" id="bDbag"></div>
     </div>`,
     [{label:'Cancel',cls:'btn-secondary',fn:()=>{}},{label:'Apply',cls:'btn-primary',fn:()=>{
-      const pk=document.getElementById('bPkr')?.value||'',ip=document.getElementById('bIP')?.value||'',db=document.getElementById('bDbag')?.value||'';
-      idxs.forEach(i=>{if(s.rows[i]){if(pk)s.rows[i].packer=pk;if(ip)s.rows[i].ip=ip;if(db)s.rows[i].dbag=db;}});
+      const pk=document.getElementById('bPkr')?.value||'',ip=document.getElementById('bIP')?.value||'';
+      idxs.forEach(i=>{if(s.rows[i]){if(pk)s.rows[i].packer=pk;if(ip)s.rows[i].ip=ip;}});
       if(pk&&!S.knownPackers.includes(pk))S.knownPackers.push(pk);
       if(ip&&!S.knownIPs.includes(ip))S.knownIPs.push(ip);
       save();renderSections();updateDL();toast(`Applied to ${idxs.length} rows`);
@@ -2823,7 +2824,7 @@ function buildPackLogBody(s, rows, packerName, now){
     body+='<tr><td>'+(i+1)+'</td><td>'+(r.serialNumber||'\u2014')+'</td><td>'+(r.dom||'\u2014')+'</td><td>'+(r.pis||'\u2014')+'</td><td>'+(r.osd||'\u2014')+'</td><td>'+(r.dbag||'\u2014')+'</td><td>'+(r.packer||'\u2014')+'</td><td>'+(r.ip||'\u2014')+'</td><td>'+fmtPrintDate(r.packDate)+'</td></tr>';
   });
   body+='</tbody></table>';
-  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Packer'+(packerName?': '+packerName.toUpperCase():'')+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field" style="margin-top:14px;"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field" style="margin-top:14px;"></div></div></div>';
+  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Packer'+(packerName?': '+packerName.toUpperCase():'')+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
   body+='<div class="footer">Parachute Management System \u2014 Pack Log Generated '+now+'</div>';
   return body;
 }
@@ -3093,7 +3094,7 @@ const FACILITY_CONFIGS={
     label:'Maintenance / Inspection',
     systems:['T-11','T-11R','T-11R SP','MC-6','RA-1','RA-1R','G-11','G-12','G-12E'],
     defaultMax:{default:56},
-    statusDefault:['Inspection','Repair','Condemned']
+    statusDefault:['Inspection','Repair','Out of Service']
   },
   airdrop:{
     label:'Rigging / Airdrop',
@@ -3200,7 +3201,7 @@ function renderWizardStep(){
         if(!allCats.includes(c)) allCats.push(c);
       });
     });
-    const extraCats=['Popped','Maintenance','Inspection','Repair','Condemned'];
+    const extraCats=['Popped','Maintenance','Inspection','Repair','Out of Service'];
     extraCats.forEach(c=>{if(!allCats.includes(c)) allCats.push(c);});
     if(d.statusCats.length===0){
       d.facilityTypes.forEach(ft=>{
