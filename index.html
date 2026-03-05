@@ -5723,26 +5723,25 @@ function openBarcodePreview(serialNumbers){
   var body='<h1>Barcode Labels</h1>';
   body+='<div class="header-info">'+serialNumbers.length+' labels \u00b7 Generated '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})+'</div>';
   body+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:12px;">';
+  
+  // Pre-render barcodes as canvas data URLs
   serialNumbers.forEach(function(sn,idx){
     body+='<div style="border:1px dashed #ccc;padding:6px 8px;text-align:center;page-break-inside:avoid;">';
-    body+='<svg id="bc-'+idx+'"></svg>';
+    // Create a temporary canvas to render barcode
+    var canvas=document.createElement('canvas');
+    try{
+      JsBarcode(canvas,sn,{format:'CODE128',width:1.5,height:40,fontSize:11,margin:2,displayValue:true});
+      var dataUrl=canvas.toDataURL('image/png');
+      body+='<img src="'+dataUrl+'" style="max-width:100%;">';
+    }catch(e){
+      body+='<div style="font-size:12px;font-weight:600;padding:10px;">'+esc(sn)+'</div>';
+    }
     body+='</div>';
   });
+  
   body+='</div>';
   body+='<div class="footer">Parachute Management System \u2014 Barcode Labels</div>';
   openPrintPreview('Barcode Labels ('+serialNumbers.length+')', body);
-  setTimeout(function(){
-    serialNumbers.forEach(function(sn,idx){
-      var el=document.querySelector('#bc-'+idx);
-      if(el&&typeof JsBarcode!=='undefined'){
-        try{
-          JsBarcode(el,sn,{format:'CODE128',width:1.5,height:40,fontSize:11,margin:2,displayValue:true});
-        }catch(e){
-          el.outerHTML='<div style="font-size:10px;color:#999;">'+esc(sn)+'</div>';
-        }
-      }
-    });
-  },300);
 }
 
 // ══ TAB NAVIGATION ══
