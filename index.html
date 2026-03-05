@@ -300,6 +300,86 @@
   .role-masteradmin { background:rgba(255,215,0,0.2); color:#ffd700; }
   .role-rigger { background:var(--success-dim); color:var(--success); }
   .role-viewer { background:rgba(168,85,247,0.15); color:#a855f7; }
+
+  /* ═══ MOBILE RESPONSIVE ═══ */
+  @media (max-width: 768px) {
+    .top-bar-row1 { padding: 0 12px; height: 40px; }
+    .top-bar-row2 { padding: 0 8px; }
+    .app-logo span { display: none; }
+    .app-logo { font-size: 16px; }
+    .nav-tabs { gap: 0; }
+    .nav-tab { padding: 6px 10px; font-size: 11px; }
+    .search-input { width: 140px; font-size: 12px; padding: 5px 8px 5px 28px; }
+    .search-icon { font-size: 12px; left: 8px; }
+    .main-content { padding: 12px; }
+    .page-header { flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .page-title { font-size: 16px; }
+    .btn { padding: 6px 12px; font-size: 12px; }
+    .btn-sm { padding: 4px 8px; font-size: 11px; }
+
+    /* Sections */
+    .section-header { padding: 8px 12px; flex-wrap: wrap; gap: 6px; }
+    .section-header-left { flex-wrap: wrap; gap: 6px; }
+    .section-date-info { display: none; }
+    .section-body { padding: 8px; }
+    .section-toolbar { flex-direction: column; align-items: flex-start; }
+    .section-table-scroll { max-height: 200px; }
+
+    /* Data table - horizontal scroll with compact cells */
+    .data-table { font-size: 11px; }
+    .data-table th { padding: 5px 4px; font-size: 9px; }
+    .data-table td { padding: 3px 4px; }
+    .data-table input[type="text"],
+    .data-table input[type="date"],
+    .data-table select { font-size: 11px; padding: 3px 4px; min-width: 50px; }
+    .data-table input[type="date"] { width: 95px !important; }
+
+    /* Tracker bar */
+    .tracker-bar { padding: 6px 8px; flex-wrap: wrap; }
+    .tracker-col { padding: 4px 6px; }
+    .tracker-col-title { font-size: 9px; }
+    .tracker-input.bin { width: 50px; }
+    .tracker-input.qty { width: 32px; }
+
+    /* PSR */
+    .psr-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .psr-stat { padding: 10px; }
+    .psr-stat-value { font-size: 22px; }
+    .psr-section { padding: 10px; }
+
+    /* Modal */
+    .modal { width: 95vw; padding: 16px; }
+    .modal-title { font-size: 14px; }
+    .confirm-dialog { width: 95vw; padding: 16px; }
+    .login-box { width: 90vw; padding: 20px; }
+
+    /* Archive */
+    .archive-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .archive-item-actions { width: 100%; }
+
+    /* Admin */
+    #page-admin > div[style*="display:flex"] { flex-direction: column; }
+
+    /* Toast */
+    .toast-container { left: 12px; right: 12px; bottom: 12px; }
+    .toast { min-width: auto; font-size: 12px; }
+
+    /* Print preview */
+    .print-toolbar { padding: 8px 12px; flex-wrap: wrap; gap: 6px; }
+    .print-content { padding: 8px; }
+    .print-page { padding: 16px; font-size: 10px; }
+  }
+
+  @media (max-width: 480px) {
+    .top-bar-row1 { height: 36px; }
+    .nav-tab { padding: 5px 7px; font-size: 10px; }
+    .search-input { width: 100px; }
+    .page-title { font-size: 14px; }
+    .section-meta { display: none; }
+    .section-badge { font-size: 10px; padding: 2px 6px; }
+    .psr-summary { grid-template-columns: 1fr 1fr; }
+    .user-pill { font-size: 10px; padding: 1px 6px; }
+  }
 </style>
 </head>
 <body>
@@ -2746,56 +2826,247 @@ function updateBinDL(){
 
 // ── Archive Page ──
 function renderArchive(){
-  const c=document.getElementById('archiveContent');
-  if(!c) return;
+  const cont=document.getElementById('archiveContent');
+  if(!cont) return;
   purgeOldArchive();
+  if(!S.monthlySnapshots) S.monthlySnapshots=[];
   let html='';
 
-  // Deleted Sections
-  if(S.archive.deletedSections.length>0){
-    html+=`<div class="archive-group"><div class="archive-group-title">🗂 Deleted Sections (auto-purge after 7 days)</div>`;
-    S.archive.deletedSections.forEach((s,i)=>{
-      const days=daysUntilPurge(s.deletedAt);
-      html+=`<div class="archive-item">
-        <div class="archive-item-info">
-          <div class="archive-item-title">${esc(s.binLocation)} — ${s.systemType}</div>
-          <div class="archive-item-meta">${s.rows?.length||0} rows · ${days} day${days!==1?'s':''} until purge</div>
-        </div>
-        <div class="archive-item-actions">
-          <button class="btn btn-primary btn-sm" onclick="restoreSection(${i})">↶ Restore</button>
-          <button class="btn btn-danger btn-sm" onclick="permDeleteSection(${i})">✕ Delete</button>
-        </div>
-      </div>`;
+  // ═══ Monthly Archive Folders ═══
+  // Generate last 12 months
+  var now=new Date();
+  var months=[];
+  for(var m=0;m<12;m++){
+    var d=new Date(now.getFullYear(), now.getMonth()-m, 1);
+    months.push({
+      label:getMonthLabel(d),
+      year:d.getFullYear(),
+      month:d.getMonth(),
+      isCurrent:m===0
     });
-    html+=`</div>`;
+  }
+
+  html+='<div style="margin-bottom:24px;">';
+  html+='<div style="font-size:15px;font-weight:600;margin-bottom:12px;">Monthly Archive</div>';
+  
+  months.forEach(function(mo){
+    var snapshot=S.monthlySnapshots.find(function(s){return s.label===mo.label;});
+    
+    // Count rows packed this month from current data (for current month)
+    var monthPacked=0;
+    if(mo.isCurrent){
+      S.sections.forEach(function(sec){
+        sec.rows.forEach(function(r){
+          if(r.packDate){
+            var pd=new Date(r.packDate+'T00:00:00');
+            if(pd.getFullYear()===mo.year&&pd.getMonth()===mo.month&&r.serialNumber&&r.packer&&r.ip) monthPacked++;
+          }
+        });
+      });
+    } else if(snapshot){
+      monthPacked=snapshot.totalChutes||0;
+    }
+    
+    var hasData=mo.isCurrent?monthPacked>0:!!snapshot;
+    var statusIcon=hasData?'\u{1F4C1}':'\u{1F4C2}';
+    var statusColor=hasData?'var(--accent)':'var(--text-muted)';
+    
+    html+='<div class="archive-item" style="cursor:'+(hasData?'pointer':'default')+';'+(hasData?'':'opacity:0.5;')+'" '+(hasData?'onclick="toggleArchiveMonth(\''+mo.label+'\')"':'')+'>';
+    html+='<div class="archive-item-info">';
+    html+='<div class="archive-item-title" style="display:flex;align-items:center;gap:8px;"><span style="font-size:16px;">'+statusIcon+'</span> '+mo.label+(mo.isCurrent?' <span style="font-size:10px;background:var(--accent-dim);color:var(--accent);padding:2px 6px;border-radius:4px;">Current</span>':'')+'</div>';
+    html+='<div class="archive-item-meta">'+monthPacked+' chutes packed'+(snapshot?' · Snapshot saved '+new Date(snapshot.date).toLocaleDateString():'')+'</div>';
+    html+='</div>';
+    if(hasData){
+      html+='<div class="archive-item-actions">';
+      if(mo.isCurrent){
+        html+='<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();createManualSnapshot(\''+mo.label+'\')">Save Snapshot</button>';
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+    
+    // Expandable content for this month
+    html+='<div id="archive-'+mo.label.replace(/\s/g,'-')+'" style="display:none;margin:0 0 8px 28px;">';
+    
+    if(hasData){
+      // Get sections data - either from snapshot or current
+      var sectionsData=[];
+      if(mo.isCurrent){
+        sectionsData=S.sections.map(function(sec){
+          var monthRows=sec.rows.filter(function(r){
+            if(!r.packDate||!r.serialNumber||!r.packer||!r.ip) return false;
+            var pd=new Date(r.packDate+'T00:00:00');
+            return pd.getFullYear()===mo.year&&pd.getMonth()===mo.month;
+          });
+          return {binLocation:sec.binLocation,systemType:sec.systemType,maxChutes:sec.maxChutes,rows:monthRows,rowCount:monthRows.length,id:sec.id};
+        }).filter(function(s){return s.rowCount>0;});
+      } else if(snapshot&&snapshot.sections){
+        sectionsData=snapshot.sections;
+      }
+      
+      if(sectionsData.length>0){
+        // Pack Log buttons
+        html+='<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:8px 0 6px 0;">Pack Logs</div>';
+        sectionsData.forEach(function(sec){
+          html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">';
+          html+='<span style="font-size:11px;color:var(--text-muted);width:180px;">'+esc(sec.binLocation)+' ('+sec.systemType+')</span>';
+          html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();printArchivePackLog(\''+mo.label+'\',\''+esc(sec.binLocation)+'\',\''+sec.systemType+'\')">\u{1F5A8} Pack Log ('+sec.rowCount+' entries)</button>';
+          html+='</div>';
+        });
+        
+        // FI Sheet buttons
+        html+='<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:10px 0 6px 0;">FI Sheets</div>';
+        // Group by packer
+        var packers={};
+        sectionsData.forEach(function(sec){
+          (sec.rows||[]).forEach(function(r){
+            if(r.packer){
+              if(!packers[r.packer]) packers[r.packer]=[];
+              packers[r.packer].push({sec:sec,row:r});
+            }
+          });
+        });
+        Object.keys(packers).sort().forEach(function(packer){
+          var count=packers[packer].length;
+          html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">';
+          html+='<span style="font-size:11px;color:var(--text-muted);width:180px;">'+esc(packer)+'</span>';
+          html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();printArchiveFI(\''+mo.label+'\',\''+esc(packer)+'\')">\u{1F5A8} FI Sheet ('+count+' packs)</button>';
+          html+='</div>';
+        });
+      } else {
+        html+='<div style="font-size:11px;color:var(--text-muted);padding:8px 0;">No pack records for this month</div>';
+      }
+    }
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // ═══ Deleted Sections (existing) ═══
+  if(S.archive.deletedSections.length>0){
+    html+='<div class="archive-group"><div class="archive-group-title">\u{1F5C2} Deleted Sections (auto-purge after 7 days)</div>';
+    S.archive.deletedSections.forEach(function(s,i){
+      var days=daysUntilPurge(s.deletedAt);
+      html+='<div class="archive-item"><div class="archive-item-info"><div class="archive-item-title">'+esc(s.binLocation)+' \u2014 '+s.systemType+'</div><div class="archive-item-meta">'+(s.rows?.length||0)+' rows \u00b7 '+days+' day'+(days!==1?'s':'')+' until purge</div></div><div class="archive-item-actions"><button class="btn btn-primary btn-sm" onclick="restoreSection('+i+')">\u21B6 Restore</button><button class="btn btn-danger btn-sm" onclick="permDeleteSection('+i+')">\u2715 Delete</button></div></div>';
+    });
+    html+='</div>';
   }
 
   // Deleted Rows
   if(S.archive.deletedRows.length>0){
-    html+=`<div class="archive-group"><div class="archive-group-title">📝 Deleted Rows (auto-purge after 7 days)</div>`;
-    S.archive.deletedRows.forEach((r,i)=>{
-      const days=daysUntilPurge(r.deletedAt);
-      html+=`<div class="archive-item">
-        <div class="archive-item-info">
-          <div class="archive-item-title">S/N: ${esc(r.serialNumber)||'(empty)'} · ${r.fromSystem||''}</div>
-          <div class="archive-item-meta">From: ${esc(r.fromBin||'')} · Packer: ${esc(r.packer||'—')} · ${days} day${days!==1?'s':''} until purge</div>
-        </div>
-        <div class="archive-item-actions">
-          <button class="btn btn-primary btn-sm" onclick="restoreRow(${i})">↶ Restore</button>
-          <button class="btn btn-danger btn-sm" onclick="permDeleteRow(${i})">✕ Delete</button>
-        </div>
-      </div>`;
+    html+='<div class="archive-group"><div class="archive-group-title">\u{1F4DD} Deleted Rows (auto-purge after 7 days)</div>';
+    S.archive.deletedRows.forEach(function(r,i){
+      var days=daysUntilPurge(r.deletedAt);
+      html+='<div class="archive-item"><div class="archive-item-info"><div class="archive-item-title">S/N: '+esc(r.serialNumber||'(empty)')+' \u00b7 '+(r.fromSystem||'')+'</div><div class="archive-item-meta">From: '+esc(r.fromBin||'')+' \u00b7 Packer: '+esc(r.packer||'\u2014')+' \u00b7 '+days+' day'+(days!==1?'s':'')+' until purge</div></div><div class="archive-item-actions"><button class="btn btn-primary btn-sm" onclick="restoreRow('+i+')">\u21B6 Restore</button><button class="btn btn-danger btn-sm" onclick="permDeleteRow('+i+')">\u2715 Delete</button></div></div>';
     });
-    html+=`</div>`;
+    html+='</div>';
   }
 
-  if(!S.archive.deletedSections.length && !S.archive.deletedRows.length){
-    html=`<div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-text">Archive is empty</div><div class="empty-state-hint">Deleted rows and sections appear here for 7 days</div></div>`;
+  if(!S.archive.deletedSections.length && !S.archive.deletedRows.length && !S.monthlySnapshots.length){
+    // Still show monthly folders even if empty
   }
 
-  c.innerHTML=html;
+  cont.innerHTML=html;
 }
 
+function toggleArchiveMonth(label){
+  var id='archive-'+label.replace(/\s/g,'-');
+  var el=document.getElementById(id);
+  if(el) el.style.display=el.style.display==='none'?'block':'none';
+}
+
+function createManualSnapshot(label){
+  if(!S.monthlySnapshots) S.monthlySnapshots=[];
+  // Remove existing snapshot for this month
+  S.monthlySnapshots=S.monthlySnapshots.filter(function(s){return s.label!==label;});
+  createSnapshot(label);
+  save();
+  renderArchive();
+  toast('Snapshot saved for '+label,'success');
+}
+
+function printArchivePackLog(monthLabel,binLocation,systemType){
+  // Find the data - either from snapshot or current
+  var snapshot=S.monthlySnapshots.find(function(s){return s.label===monthLabel;});
+  var secData=null;
+  
+  if(snapshot&&snapshot.sections){
+    secData=snapshot.sections.find(function(s){return s.binLocation===binLocation&&s.systemType===systemType;});
+  }
+  if(!secData){
+    // Try current data
+    var sec=S.sections.find(function(s){return s.binLocation===binLocation&&s.systemType===systemType;});
+    if(sec){
+      var mParts=monthLabel.split(' ');
+      var mNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+      var mIdx=mNames.indexOf(mParts[0]);
+      var mYear=parseInt(mParts[1]);
+      secData={
+        binLocation:sec.binLocation,systemType:sec.systemType,maxChutes:sec.maxChutes,
+        rows:sec.rows.filter(function(r){
+          if(!r.packDate||!r.serialNumber) return false;
+          var pd=new Date(r.packDate+'T00:00:00');
+          return pd.getFullYear()===mYear&&pd.getMonth()===mIdx;
+        })
+      };
+    }
+  }
+  if(!secData||!secData.rows||secData.rows.length===0){toast('No data found','warning');return;}
+  
+  // Build pack log HTML
+  var now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var body='<h1>Pack Log — '+monthLabel+'</h1>';
+  body+='<div class="header-info">Section: '+esc(secData.binLocation)+' · System: '+secData.systemType+' · Generated: '+now+'</div>';
+  body+='<table><thead><tr><th>#</th><th>Serial Number</th><th>DOM</th><th>PIS</th><th>OSD</th><th>D-Bag</th><th>Packer</th><th>IP</th><th>Pack Date</th></tr></thead><tbody>';
+  secData.rows.forEach(function(r,idx){
+    body+='<tr><td>'+(idx+1)+'</td><td>'+esc(r.serialNumber||'')+'</td><td>'+(r.dom||'\u2014')+'</td><td>'+(r.pis||'\u2014')+'</td><td>'+(r.osd||'\u2014')+'</td><td>'+esc(r.dbag||'\u2014')+'</td><td>'+esc(r.packer||'\u2014')+'</td><td>'+esc(r.ip||'\u2014')+'</td><td>'+(r.packDate||'\u2014')+'</td></tr>';
+  });
+  body+='</tbody></table>';
+  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Reviewed By</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
+  body+='<div class="footer">Parachute Management System — Archive Pack Log — '+monthLabel+'</div>';
+  openPrintPreview('Pack Log — '+secData.binLocation+' — '+monthLabel, body);
+}
+
+function printArchiveFI(monthLabel,packerName){
+  var snapshot=S.monthlySnapshots.find(function(s){return s.label===monthLabel;});
+  var allRows=[];
+  
+  if(snapshot&&snapshot.sections){
+    snapshot.sections.forEach(function(sec){
+      (sec.rows||[]).forEach(function(r){
+        if(r.packer===packerName) allRows.push({r:r,sec:sec});
+      });
+    });
+  }
+  if(allRows.length===0){
+    // Try current data
+    var mParts=monthLabel.split(' ');
+    var mNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var mIdx=mNames.indexOf(mParts[0]);
+    var mYear=parseInt(mParts[1]);
+    S.sections.forEach(function(sec){
+      sec.rows.forEach(function(r){
+        if(r.packer===packerName&&r.packDate){
+          var pd=new Date(r.packDate+'T00:00:00');
+          if(pd.getFullYear()===mYear&&pd.getMonth()===mIdx) allRows.push({r:r,sec:sec});
+        }
+      });
+    });
+  }
+  if(allRows.length===0){toast('No data found for '+packerName,'warning');return;}
+  
+  var now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var body='<h1>Final Inspection Sheet — '+monthLabel+'</h1>';
+  body+='<div class="header-info">Packer: '+esc(packerName)+' · '+allRows.length+' inspections · Generated: '+now+'</div>';
+  body+='<table><thead><tr><th>#</th><th>Section</th><th>System</th><th>Serial Number</th><th>DOM</th><th>PIS</th><th>D-Bag</th><th>IP</th><th>Pack Date</th></tr></thead><tbody>';
+  allRows.forEach(function(item,idx){
+    var r=item.r,sec=item.sec;
+    body+='<tr><td>'+(idx+1)+'</td><td>'+esc(sec.binLocation)+'</td><td>'+sec.systemType+'</td><td>'+esc(r.serialNumber||'')+'</td><td>'+(r.dom||'\u2014')+'</td><td>'+(r.pis||'\u2014')+'</td><td>'+esc(r.dbag||'\u2014')+'</td><td>'+esc(r.ip||'\u2014')+'</td><td>'+(r.packDate||'\u2014')+'</td></tr>';
+  });
+  body+='</tbody></table>';
+  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Inspector: '+esc(packerName)+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
+  body+='<div class="footer">Parachute Management System — Archive FI Sheet — '+monthLabel+'</div>';
+  openPrintPreview('FI Sheet — '+esc(packerName)+' — '+monthLabel, body);
+}
 function permDeleteSection(i){
   showConfirm('Permanently Delete?','This cannot be undone.',
     [{label:'Cancel',cls:'btn-secondary',fn:()=>{}},{label:'Delete Forever',cls:'btn-danger',fn:()=>{
@@ -4004,7 +4275,7 @@ function takeSnapshot(){
 
 function createSnapshot(label){
   let totalChutes=0, totalPopped=0, totalSignedOut=0, totalMaint=0;
-  S.sections.forEach(sec=>totalChutes+=sec.rows.length);
+  S.sections.forEach(sec=>totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length);
   STATUS_SYS.forEach(sys=>{
     (S.statusCounts[sys]?.popped||[]).forEach(e=>totalPopped+=(parseInt(e.count)||0));
     (S.statusCounts[sys]?.maintenance||[]).forEach(e=>totalMaint+=(parseInt(e.count)||0));
