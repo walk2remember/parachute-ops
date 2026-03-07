@@ -2474,7 +2474,7 @@ function expClass(dateStr){
 }
 
 function sectionHTML(sec){
-  const rc=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;}).length; const soCount=sec.rows.filter(function(r){return r._signedOut;}).length; const totalRows=sec.rows.length;
+  const rc=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length; const soCount=sec.rows.filter(function(r){return r._signedOut;}).length; const totalRows=sec.rows.length;
   const earliest=getEarliestExpiration(sec);
   let dateInfo='';
   if(earliest){
@@ -2487,7 +2487,7 @@ function sectionHTML(sec){
         <span class="section-collapse-icon">▼</span>
         <span class="section-badge ${badge(sec.systemType)}">${sec.systemType}</span>
         <span class="section-title">${sec.binLocation}</span>
-        <span class="section-meta">${rc} packed${soCount>0?' / '+soCount+' signed out':''} / ${totalRows} entries / ${sec.maxChutes} max</span>
+        <span class="section-meta">${rc} packed / ${totalRows} entries / ${sec.maxChutes} max</span>
         ${dateInfo}
       </div>
       <div class="section-header-right">
@@ -2527,10 +2527,10 @@ function rowHTML(sec,r,i){
   const osdDisplay=r.osd||calcOSDString(r.dom,r.pis)||'—';
   const osdColor=osdStatus==='red'?'color:#dc2626;font-weight:700;':osdStatus==='yellow'?'color:#d97706;font-weight:700;':'';
   var ti=i*8+1;
-  var soStyle=r._signedOut?'opacity:0.4;background:rgba(239,68,68,0.08);':'';
+  var soStyle='';
   return `<tr class="${locked?'row-locked':''}" style="${rowStyle}${soStyle}" title="${r._signedOut?'Signed out to '+(r._signedOutTo||'?')+' on '+(r._signedOutDate||'?'):''}">
     <td><input type="checkbox" class="row-cb" data-sec="${sec.id}" data-ri="${i}" tabindex="-1"></td>
-    <td><input type="text" value="${esc(r.serialNumber)}" placeholder="S/N" onchange="onSN(${sec.id},${i},this.value)" class="tab-field" ${dis}>${r._signedOut?'<span style="font-size:9px;color:var(--danger);font-weight:700;"> OUT</span>':''}</td>
+    <td><input type="text" value="${esc(r.serialNumber)}" placeholder="S/N" onchange="onSN(${sec.id},${i},this.value)" class="tab-field" ${dis}></td>
     <td><input type="text" value="${esc(r.dom)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'dom')" onkeydown="onDateKey(event,this,${sec.id},${i},'dom')" style="width:65px;" class="tab-field" ${dis}></td>
     <td><input type="text" value="${esc(r.pis)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'pis')" onkeydown="onDateKey(event,this,${sec.id},${i},'pis')" style="width:65px;" class="tab-field" ${dis}></td>
     <td><span class="cell-readonly" style="${osdColor}">${osdDisplay}</span></td>
@@ -2574,7 +2574,7 @@ function addRow(id){
     tmp.innerHTML=rowHTML(s,s.rows[idx],idx);
     const tr=tmp.firstElementChild; tb.appendChild(tr);
     const card=document.querySelector(`.section-card[data-section-id="${id}"]`);
-    if(card){const m=card.querySelector('.section-meta');if(m){var pc=s.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;}).length;m.textContent=pc+' packed / '+s.rows.length+' entries / '+s.maxChutes+' max';}}
+    if(card){const m=card.querySelector('.section-meta');if(m){var pc=s.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;m.textContent=pc+' packed / '+s.rows.length+' entries / '+s.maxChutes+' max';}}
     tr.querySelector('input[type="text"]')?.focus();
   } else renderSections();
 }
@@ -2899,7 +2899,7 @@ function renderArchive(){
         sec.rows.forEach(function(r){
           if(r.packDate){
             var pd=new Date(r.packDate+'T00:00:00');
-            if(pd.getFullYear()===mo.year&&pd.getMonth()===mo.month&&r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped) monthPacked++;
+            if(pd.getFullYear()===mo.year&&pd.getMonth()===mo.month&&r.serialNumber&&r.packer&&r.ip) monthPacked++;
           }
         });
       });
@@ -3986,10 +3986,10 @@ function renderPSR(){
   const ipToday={};
 
   S.sections.forEach(sec=>{
-    totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;}).length;
+    totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
     totalCapacity+=sec.maxChutes;
     if(!systemTotals[sec.systemType]) systemTotals[sec.systemType]={count:0,capacity:0};
-    systemTotals[sec.systemType].count+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;}).length;
+    systemTotals[sec.systemType].count+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
     systemTotals[sec.systemType].capacity+=sec.maxChutes;
 
     let earliestExp=null;
@@ -4008,7 +4008,7 @@ function renderPSR(){
       if(r.ip&&r.packDate===today) ipToday[r.ip]=(ipToday[r.ip]||0)+1;
     });
 
-    var packedLen=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;}).length; const pct=sec.maxChutes>0?Math.round((packedLen/sec.maxChutes)*100):0;
+    var packedLen=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length; const pct=sec.maxChutes>0?Math.round((packedLen/sec.maxChutes)*100):0;
     binSummary.push({
       bin:sec.binLocation, system:sec.systemType, count:packedLen,
       max:sec.maxChutes, pct, earliestExp, secId:sec.id
@@ -4027,7 +4027,7 @@ function renderPSR(){
   // Signed out totals
   if(!S.signedOut) S.signedOut=[];
   let totalSignedOut=0;
-  S.sections.forEach(function(sec){sec.rows.forEach(function(r){if(r._signedOut) totalSignedOut++;});});
+  (S.signedOut||[]).filter(function(s){return s.status==='out';}).forEach(function(s){totalSignedOut+=(s.scannedOut||[]).length;});
 
   // ── Summary Cards ──
   html+=`<div class="psr-summary">
@@ -4035,11 +4035,21 @@ function renderPSR(){
 
   // Count actual chutes accounted for per system family (packed + popped + maintenance + signed out)
   // T-11 family = T-11 + T-11R + T-11R SP
+  // Total capacity from equipment counts (configurable in PSR)
+  var ec=S.equipmentCounts||{};
   let actualT11=0, actualMC6=0, actualRA1=0;
-  S.sections.forEach(sec=>{
+  // Use auth (authorized) as total capacity if set
+  if(ec['T-11']&&ec['T-11'].auth) actualT11=parseInt(ec['T-11'].auth)||0;
+  else S.sections.forEach(sec=>{
     if(sec.systemType==='T-11'||sec.systemType==='T-11R'||sec.systemType==='T-11R SP') actualT11+=sec.rows.length;
-    else if(sec.systemType==='MC-6') actualMC6+=sec.rows.length;
-    else if(sec.systemType==='RA-1'||sec.systemType==='RA-1R') actualRA1+=sec.rows.length;
+  });
+  if(ec['MC-6']&&ec['MC-6'].auth) actualMC6=parseInt(ec['MC-6'].auth)||0;
+  else S.sections.forEach(sec=>{
+    if(sec.systemType==='MC-6') actualMC6+=sec.rows.length;
+  });
+  if(ec['RA-1']&&ec['RA-1'].auth) actualRA1=parseInt(ec['RA-1'].auth)||0;
+  else S.sections.forEach(sec=>{
+    if(sec.systemType==='RA-1'||sec.systemType==='RA-1R') actualRA1+=sec.rows.length;
   });
   // Add popped + maintenance
   ['T-11','T-11R/SP'].forEach(sys=>{
@@ -4100,20 +4110,9 @@ function renderPSR(){
   if(totalSignedOut>0){
     html+=`<table class="psr-table"><thead><tr><th>Unit</th><th>System</th><th>Qty</th><th></th></tr></thead><tbody>`;
     (function(){
-      // Build signed out by unit
-      var byUnit={};
-      S.sections.forEach(function(sec){sec.rows.forEach(function(r){
-        if(r._signedOut){
-          var key=(r._signedOutTo||'Unknown')+' '+(r._signedOutDate||'');
-          if(!byUnit[key]) byUnit[key]={unit:r._signedOutTo||'Unknown',date:r._signedOutDate||'',systems:{},total:0};
-          if(!byUnit[key].systems[sec.systemType]) byUnit[key].systems[sec.systemType]=0;
-          byUnit[key].systems[sec.systemType]++;
-          byUnit[key].total++;
-        }
-      });});
-      Object.values(byUnit).forEach(function(u){
-        var sysDesc=Object.keys(u.systems).map(function(s){return u.systems[s]+' '+s;}).join(', ');
-        html+=`<tr><td><strong>${esc(u.unit)}</strong></td><td>${sysDesc}</td><td><strong>${u.total}</strong></td><td>${u.date}</td></tr>`;
+      (S.signedOut||[]).filter(function(s){return s.status==='out';}).forEach(function(so){
+        var count=(so.scannedOut||[]).length;
+        html+=\`<tr><td><strong>\${esc(so.unit||'')}</strong></td><td>\${esc(so.system||'')}</td><td><strong>\${count}</strong></td><td>\${so.date||''}</td></tr>\`;
       });
     })();
   } else {
@@ -4213,7 +4212,7 @@ function renderPSR(){
   const packedBySystem={};
   S.sections.forEach(sec=>{
     if(!packedBySystem[sec.systemType]) packedBySystem[sec.systemType]=0;
-    var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;});
+    var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;});
     packedBySystem[sec.systemType]+=packedRows.length;
   });
 
@@ -4319,7 +4318,7 @@ function takeSnapshot(){
 
 function createSnapshot(label){
   let totalChutes=0, totalPopped=0, totalSignedOut=0, totalMaint=0;
-  S.sections.forEach(sec=>totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;}).length);
+  S.sections.forEach(sec=>totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length);
   STATUS_SYS.forEach(sys=>{
     (S.statusCounts[sys]?.popped||[]).forEach(e=>totalPopped+=(parseInt(e.count)||0));
     (S.statusCounts[sys]?.maintenance||[]).forEach(e=>totalMaint+=(parseInt(e.count)||0));
@@ -4449,9 +4448,9 @@ function printPSR(){
   let totalChutes=0, totalExpired=0, expiring7=0, expiring30=0;
   const packedBySys={};
   S.sections.forEach(sec=>{
-    totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;}).length;
+    totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
     if(!packedBySys[sec.systemType]) packedBySys[sec.systemType]=0;
-    var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;});
+    var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;});
     packedBySys[sec.systemType]+=packedRows.length;
     sec.rows.forEach(r=>{
       if(r.expirationDate){
@@ -4474,11 +4473,21 @@ function printPSR(){
   (S.signedOut||[]).filter(function(s){return s.status==='out'||!s.status;}).forEach(s=>totalSignedOut+=(parseInt(s.count)||0));
 
   // Capacity
+  // Total capacity from equipment counts (configurable in PSR)
+  var ec=S.equipmentCounts||{};
   let actualT11=0, actualMC6=0, actualRA1=0;
-  S.sections.forEach(sec=>{
+  // Use auth (authorized) as total capacity if set
+  if(ec['T-11']&&ec['T-11'].auth) actualT11=parseInt(ec['T-11'].auth)||0;
+  else S.sections.forEach(sec=>{
     if(sec.systemType==='T-11'||sec.systemType==='T-11R'||sec.systemType==='T-11R SP') actualT11+=sec.rows.length;
-    else if(sec.systemType==='MC-6') actualMC6+=sec.rows.length;
-    else if(sec.systemType==='RA-1'||sec.systemType==='RA-1R') actualRA1+=sec.rows.length;
+  });
+  if(ec['MC-6']&&ec['MC-6'].auth) actualMC6=parseInt(ec['MC-6'].auth)||0;
+  else S.sections.forEach(sec=>{
+    if(sec.systemType==='MC-6') actualMC6+=sec.rows.length;
+  });
+  if(ec['RA-1']&&ec['RA-1'].auth) actualRA1=parseInt(ec['RA-1'].auth)||0;
+  else S.sections.forEach(sec=>{
+    if(sec.systemType==='RA-1'||sec.systemType==='RA-1R') actualRA1+=sec.rows.length;
   });
   ['T-11','T-11R/SP'].forEach(sys=>{
     (S.statusCounts[sys]?.popped||[]).forEach(e=>actualT11+=(parseInt(e.count)||0));
@@ -4660,7 +4669,7 @@ function renderWeekly(){
     let totalPacked=0, totalExpired=0, popped=0;
     S.sections.forEach(sec=>{
       if(sec.systemType!==sys) return;
-      totalPacked+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;}).length;
+      totalPacked+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
       sec.rows.forEach(r=>{
         if(r.expirationDate){
           const exp=new Date(r.expirationDate+'T00:00:00');
@@ -5718,7 +5727,7 @@ function renderOps(){
 
 // ═══ HELPER: count packed (not signed out) chutes ═══
 function countPacked(sec){
-  return sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped&&!r._signedOut;}).length;
+  return sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length;
 }
 
 // ═══ MODE 1: PACK ═══
@@ -5861,7 +5870,7 @@ function opsCalcSignOut(){
     var bins=[];
     S.sections.forEach(function(sec){
       if(sec.systemType!==item.system) return;
-      var packed=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped&&!r._signedOut;});
+      var packed=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;});
       if(packed.length===0) return;
       var earliestExp=null;
       packed.forEach(function(r){
@@ -6026,22 +6035,21 @@ function opsScanOutChute(signOutIdx){
     toast(sn+' already scanned out','warning');return;
   }
   
-  // Find chute
+  // Find chute - must be packed and not already signed out
   var found=null;
   S.sections.forEach(function(sec){
     sec.rows.forEach(function(r){
-      if(r.serialNumber===sn&&!r._signedOut) found={sec:sec,row:r};
+      if(r.serialNumber===sn&&!r._signedOut&&!r._popped) found={sec:sec,row:r};
     });
   });
   
   if(!found){
-    // Check if already signed out
     var alreadyOut=false;
     S.sections.forEach(function(sec){sec.rows.forEach(function(r){
       if(r.serialNumber===sn&&r._signedOut) alreadyOut=true;
     });});
     if(alreadyOut){toast(sn+' is already signed out','error');return;}
-    toast(sn+' not found in any section','error');return;
+    toast(sn+' not found or not packed in any section','error');return;
   }
   
   // Validate system type
@@ -6050,14 +6058,14 @@ function opsScanOutChute(signOutIdx){
     toast(sn+' is a '+found.sec.systemType+' \u2014 this sign-out is for '+allowedSystems.join(', '),'error');return;
   }
   
-  // Mark chute as signed out
-  found.row._signedOut=true;
-  found.row._signedOutTo=so.unit;
-  found.row._signedOutDate=so.date;
-  found.row._signOutIdx=signOutIdx;
+  // Remove chute from section and store in sign-out record
+  var rowData=JSON.parse(JSON.stringify(found.row));
+  var rowIdx=found.sec.rows.indexOf(found.row);
+  if(rowIdx>=0) found.sec.rows.splice(rowIdx,1);
   
-  so.scannedOut.push({sn:sn,bin:found.sec.binLocation,system:found.sec.systemType,time:new Date().toLocaleTimeString()});
+  so.scannedOut.push({sn:sn,bin:found.sec.binLocation,system:found.sec.systemType,secId:found.sec.id,time:new Date().toLocaleTimeString(),rowData:rowData});
   save();
+  renderSections();
   toast(sn+' scanned out from '+found.sec.binLocation,'success',2000);
   opsShowScanOut(signOutIdx);
 }
@@ -6076,7 +6084,7 @@ function opsFinishScanOut(signOutIdx){
          opsAutoMarkFromPlan(signOutIdx);
          _activeScanOutIdx=null;
          sessionStorage.removeItem('pms_scanOutIdx');
-         save();renderOps();
+         save();renderSections();renderOps();
          toast('Chutes auto-selected from loading plan','success');
        }},
        {label:'Delete This Sign-Out',cls:'btn-danger',fn:function(){
@@ -6119,16 +6127,15 @@ function opsAutoMarkFromPlan(signOutIdx){
     if(!sec) return;
     var remaining=plan.pull;
     // Sort rows by expiration (earliest first - they go out first)
-    var availableRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped;});
+    var availableRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;});
     availableRows.sort(function(a,b){return (a.expirationDate||'z').localeCompare(b.expirationDate||'z');});
     
     availableRows.forEach(function(r){
       if(remaining<=0) return;
-      r._signedOut=true;
-      r._signedOutTo=so.unit;
-      r._signedOutDate=so.date;
-      r._signOutIdx=signOutIdx;
-      so.scannedOut.push({sn:r.serialNumber,bin:sec.binLocation,system:sec.systemType,time:'auto'});
+      var rowData=JSON.parse(JSON.stringify(r));
+      var rowIdx=sec.rows.indexOf(r);
+      if(rowIdx>=0) sec.rows.splice(rowIdx,1);
+      so.scannedOut.push({sn:r.serialNumber,bin:sec.binLocation,system:sec.systemType,secId:sec.id,time:'auto',rowData:rowData});
       remaining--;
     });
   });
@@ -6314,47 +6321,38 @@ function opsProcessSignIn(signOutIdx){
     toast('Scanned '+scannedIn+' but marked '+live+' live. Scan all or adjust count.','error');return;
   }
   
-  // Unmark live chutes (return to bins)
-  var scannedSNs=(S._opsSignInLog||[]).map(function(e){return e.sn;});
-  var allOutSNs=(so.scannedOut||[]).map(function(s){return s.sn;});
+  // Return live chutes to their original sections
+  var scannedInSNs=(S._opsSignInLog||[]).map(function(e){return e.sn;});
+  var allScannedOut=so.scannedOut||[];
   
+  // Determine which chutes are live returns
+  var liveChutes=[];
   if(scannedIn>0){
-    // Unmark individually scanned chutes
-    scannedSNs.forEach(function(sn){
-      S.sections.forEach(function(sec){sec.rows.forEach(function(r){
-        if(r.serialNumber===sn){r._signedOut=false;delete r._signedOutTo;delete r._signedOutDate;delete r._signOutIdx;}
-      });});
-    });
+    // Individually scanned - those specific chutes come back
+    liveChutes=allScannedOut.filter(function(s){return scannedInSNs.indexOf(s.sn)>=0;});
   } else if(live>0){
-    // No individual scanning - auto-select live chutes (newest expiration first = most shelf life)
-    var outRows=[];
-    S.sections.forEach(function(sec){sec.rows.forEach(function(r){
-      if(r._signedOut && (r._signOutIdx===signOutIdx || (r._signedOutTo===so.unit && r._signedOutDate===so.date))){
-        outRows.push(r);
-      }
-    });});
-    // Sort: newest expiration first (these come back live)
-    outRows.sort(function(a,b){return (b.expirationDate||'').localeCompare(a.expirationDate||'');});
-    // Unmark the first 'live' number of chutes
-    for(var li=0;li<Math.min(live,outRows.length);li++){
-      outRows[li]._signedOut=false;
-      delete outRows[li]._signedOutTo;
-      delete outRows[li]._signedOutDate;
-      delete outRows[li]._signOutIdx;
-    }
+    // Not individually scanned - auto-select newest expiration first
+    var sorted=allScannedOut.slice().sort(function(a,b){
+      var expA=(a.rowData&&a.rowData.expirationDate)||'';
+      var expB=(b.rowData&&b.rowData.expirationDate)||'';
+      return expB.localeCompare(expA);
+    });
+    liveChutes=sorted.slice(0,live);
   }
   
-  // Clear _signedOut on ALL chutes from this sign-out (both live and popped)
-  // Live ones were already cleared above. Now clear the remaining (popped) ones.
-  S.sections.forEach(function(sec){sec.rows.forEach(function(r){
-    if(r._signedOut && (r._signOutIdx===signOutIdx || (r._signedOutTo===so.unit && r._signedOutDate===so.date))){
-      r._signedOut=false;
-      r._popped=true;
-      delete r._signedOutTo;
-      delete r._signedOutDate;
-      delete r._signOutIdx;
+  // Put live chutes back into their original sections
+  liveChutes.forEach(function(chute){
+    if(!chute.rowData) return;
+    var sec=S.sections.find(function(s){return s.id===chute.secId;});
+    if(!sec) sec=S.sections.find(function(s){return s.binLocation===chute.bin&&s.systemType===chute.system;});
+    if(sec){
+      var row=JSON.parse(JSON.stringify(chute.rowData));
+      delete row._signedOut;delete row._signedOutTo;delete row._signedOutDate;delete row._signOutIdx;delete row._popped;
+      sec.rows.push(row);
     }
-  });});
+  });
+  
+  // Popped chutes do NOT go back - they're gone
   
   // Add to popped tracker
   if(popped>0){
@@ -6398,6 +6396,7 @@ function opsProcessSignIn(signOutIdx){
   S._opsSignInLog=[];
   save();
   toast('Sign in complete: '+live+' live, '+popped+' popped','success');
+  renderSections();
   renderOps();
 }
 
