@@ -2474,7 +2474,7 @@ function expClass(dateStr){
 }
 
 function sectionHTML(sec){
-  const rc=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length; const totalRows=sec.rows.length;
+  const rc=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length; const totalRows=sec.rows.length;
   const earliest=getEarliestExpiration(sec);
   let dateInfo='';
   if(earliest){
@@ -2573,7 +2573,7 @@ function addRow(id){
     tmp.innerHTML=rowHTML(s,s.rows[idx],idx);
     const tr=tmp.firstElementChild; tb.appendChild(tr);
     const card=document.querySelector(`.section-card[data-section-id="${id}"]`);
-    if(card){const m=card.querySelector('.section-meta');if(m){var pc=s.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;m.textContent=pc+' packed / '+s.rows.length+' entries / '+s.maxChutes+' max';}}
+    if(card){const m=card.querySelector('.section-meta');if(m){var pc=s.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length;m.textContent=pc+' packed / '+s.rows.length+' entries / '+s.maxChutes+' max';}}
     tr.querySelector('input[type="text"]')?.focus();
   } else renderSections();
 }
@@ -2898,7 +2898,7 @@ function renderArchive(){
         sec.rows.forEach(function(r){
           if(r.packDate){
             var pd=new Date(r.packDate+'T00:00:00');
-            if(pd.getFullYear()===mo.year&&pd.getMonth()===mo.month&&r.serialNumber&&r.packer&&r.ip) monthPacked++;
+            if(pd.getFullYear()===mo.year&&pd.getMonth()===mo.month&&r.serialNumber&&r.packer&&r.ip&&!r._signedOut) monthPacked++;
           }
         });
       });
@@ -3985,10 +3985,10 @@ function renderPSR(){
   const ipToday={};
 
   S.sections.forEach(sec=>{
-    totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
+    totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length;
     totalCapacity+=sec.maxChutes;
     if(!systemTotals[sec.systemType]) systemTotals[sec.systemType]={count:0,capacity:0};
-    systemTotals[sec.systemType].count+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
+    systemTotals[sec.systemType].count+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length;
     systemTotals[sec.systemType].capacity+=sec.maxChutes;
 
     let earliestExp=null;
@@ -4007,7 +4007,7 @@ function renderPSR(){
       if(r.ip&&r.packDate===today) ipToday[r.ip]=(ipToday[r.ip]||0)+1;
     });
 
-    var packedLen=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length; const pct=sec.maxChutes>0?Math.round((packedLen/sec.maxChutes)*100):0;
+    var packedLen=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length; const pct=sec.maxChutes>0?Math.round((packedLen/sec.maxChutes)*100):0;
     binSummary.push({
       bin:sec.binLocation, system:sec.systemType, count:packedLen,
       max:sec.maxChutes, pct, earliestExp, secId:sec.id
@@ -4208,7 +4208,7 @@ function renderPSR(){
   const packedBySystem={};
   S.sections.forEach(sec=>{
     if(!packedBySystem[sec.systemType]) packedBySystem[sec.systemType]=0;
-    var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;});
+    var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;});
     packedBySystem[sec.systemType]+=packedRows.length;
   });
 
@@ -4314,7 +4314,7 @@ function takeSnapshot(){
 
 function createSnapshot(label){
   let totalChutes=0, totalPopped=0, totalSignedOut=0, totalMaint=0;
-  S.sections.forEach(sec=>totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length);
+  S.sections.forEach(sec=>totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length);
   STATUS_SYS.forEach(sys=>{
     (S.statusCounts[sys]?.popped||[]).forEach(e=>totalPopped+=(parseInt(e.count)||0));
     (S.statusCounts[sys]?.maintenance||[]).forEach(e=>totalMaint+=(parseInt(e.count)||0));
@@ -4444,9 +4444,9 @@ function printPSR(){
   let totalChutes=0, totalExpired=0, expiring7=0, expiring30=0;
   const packedBySys={};
   S.sections.forEach(sec=>{
-    totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
+    totalChutes+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length;
     if(!packedBySys[sec.systemType]) packedBySys[sec.systemType]=0;
-    var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;});
+    var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;});
     packedBySys[sec.systemType]+=packedRows.length;
     sec.rows.forEach(r=>{
       if(r.expirationDate){
@@ -4655,7 +4655,7 @@ function renderWeekly(){
     let totalPacked=0, totalExpired=0, popped=0;
     S.sections.forEach(sec=>{
       if(sec.systemType!==sys) return;
-      totalPacked+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
+      totalPacked+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut;}).length;
       sec.rows.forEach(r=>{
         if(r.expirationDate){
           const exp=new Date(r.expirationDate+'T00:00:00');
@@ -5653,10 +5653,26 @@ function generateBarcodes(type,format,size,secFilter){
 
 
 
-// ══ OPERATIONS SYSTEM v2 ══
+// ══ OPERATIONS SYSTEM v3 ══
+// Key principle: sign-out MARKS chutes as signed out in their rows
+// Sign-in CLEARS that mark. Chutes never leave their section.
+// A row with _signedOut=true is excluded from packed counts.
+
 var opsMode='pack';
-var opsSignOutData=null;
 var opsFormCache={unit:'',date:'',items:[]};
+
+function opsFormSave(){
+  var unit=document.getElementById('opsOutUnit');
+  var date=document.getElementById('opsOutDate');
+  if(unit) opsFormCache.unit=unit.value;
+  if(date) opsFormCache.date=date.value;
+}
+
+function clearScanOutState(){_activeScanOutIdx=null;sessionStorage.removeItem('pms_scanOutIdx');renderOps();}
+function clearSignInState(){_activeSignInIdx=null;sessionStorage.removeItem('pms_signInIdx');renderOps();}
+
+var _activeScanOutIdx=null;
+var _activeSignInIdx=null;
 
 function setOpsMode(mode){
   opsMode=mode;
@@ -5666,43 +5682,38 @@ function setOpsMode(mode){
   renderOps();
 }
 
-var _activeScanOutIdx=null;
-var _activeSignInIdx=null;
-
-
-function clearScanOutState(){_activeScanOutIdx=null;sessionStorage.removeItem('pms_scanOutIdx');renderOps();}
-function clearSignInState(){_activeSignInIdx=null;sessionStorage.removeItem('pms_signInIdx');renderOps();}
-function opsFormSave(){
-  var unit=document.getElementById('opsOutUnit');
-  var date=document.getElementById('opsOutDate');
-  if(unit) opsFormCache.unit=unit.value;
-  if(date) opsFormCache.date=date.value;
-}
-
 function renderOps(){
   var el=document.getElementById('opsContent');
   if(!el) return;
-  // Restore state from sessionStorage
+  // Restore scan state from sessionStorage
   if(_activeScanOutIdx===null){
-    var stored=sessionStorage.getItem('pms_scanOutIdx');
-    if(stored!==null) _activeScanOutIdx=parseInt(stored);
+    var s1=sessionStorage.getItem('pms_scanOutIdx');
+    if(s1!==null) _activeScanOutIdx=parseInt(s1);
   }
   if(_activeSignInIdx===null){
-    var stored2=sessionStorage.getItem('pms_signInIdx');
-    if(stored2!==null) _activeSignInIdx=parseInt(stored2);
+    var s2=sessionStorage.getItem('pms_signInIdx');
+    if(s2!==null) _activeSignInIdx=parseInt(s2);
   }
-  // Resume active scan-out or sign-in if in progress
   if(_activeScanOutIdx!==null && S.signedOut[_activeScanOutIdx] && S.signedOut[_activeScanOutIdx].status==='out'){
     opsShowScanOut(_activeScanOutIdx);
     return;
   }
-  if(_activeSignInIdx!==null && S.signedOut[_activeSignInIdx]){
+  if(_activeSignInIdx!==null && S.signedOut[_activeSignInIdx] && S.signedOut[_activeSignInIdx].status==='out'){
     opsStartSignIn(_activeSignInIdx);
     return;
   }
+  // Clear stale state
+  _activeScanOutIdx=null;_activeSignInIdx=null;
+  sessionStorage.removeItem('pms_scanOutIdx');sessionStorage.removeItem('pms_signInIdx');
+  
   if(opsMode==='pack') renderOpsPack(el);
   else if(opsMode==='signout') renderOpsSignOut(el);
   else if(opsMode==='signin') renderOpsSignIn(el);
+}
+
+// ═══ HELPER: count packed (not signed out) chutes ═══
+function countPacked(sec){
+  return sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._signedOut;}).length;
 }
 
 // ═══ MODE 1: PACK ═══
@@ -5737,8 +5748,7 @@ function opsScanPack(){
   if(!inp) return;
   var sn=inp.value.trim();
   if(!sn) return;
-  inp.value='';
-  inp.focus();
+  inp.value='';inp.focus();
   if(!S._opsPackLog) S._opsPackLog=[];
   var found=null;
   S.sections.forEach(function(sec){
@@ -5751,6 +5761,7 @@ function opsScanPack(){
     var days=CFG[found.sec.systemType]?CFG[found.sec.systemType].expDays:182;
     var exp=new Date();exp.setDate(exp.getDate()+days);
     found.row.expirationDate=exp.toISOString().split('T')[0];
+    found.row._signedOut=false;
     save();
     S._opsPackLog.push({sn:sn,bin:found.sec.binLocation+' ('+found.sec.systemType+')',status:'OK',time:new Date().toLocaleTimeString()});
     toast(sn+' packed in '+found.sec.binLocation,'success',2000);
@@ -5768,7 +5779,6 @@ function opsScanPack(){
 
 // ═══ MODE 2: SIGN OUT ═══
 function renderOpsSignOut(el){
-  // Restore cached form data
   var fc=opsFormCache;
   var html='<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:20px;">';
   html+='<h3 style="font-size:15px;margin-bottom:12px;">Sign Out Mode</h3>';
@@ -5779,21 +5789,19 @@ function renderOpsSignOut(el){
   html+='<div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="opsOutDate" value="'+(fc.date||new Date().toISOString().split('T')[0])+'" onchange="opsFormCache.date=this.value"></div>';
   html+='</div>';
   
-  // System type items list
-  html+='<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Systems to Sign Out</div>';
-  
-  // Get available systems
+  // Available systems (only count non-signed-out packed chutes)
   var sysAvail={};
   S.sections.forEach(function(sec){
     if(!sysAvail[sec.systemType]) sysAvail[sec.systemType]=0;
-    sysAvail[sec.systemType]+=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;
+    sysAvail[sec.systemType]+=countPacked(sec);
   });
   
   if(!fc.items) fc.items=[];
   
+  html+='<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Systems to Sign Out</div>';
   fc.items.forEach(function(item,idx){
     html+='<div style="display:flex;gap:8px;align-items:end;margin-bottom:8px;">';
-    html+='<div style="flex:1;"><select class="form-input" onchange="opsFormCache.items['+idx+'].system=this.value;renderOps()">';
+    html+='<div style="flex:1;"><select class="form-input" onchange="opsFormCache.items['+idx+'].system=this.value">';
     html+='<option value="">Select system...</option>';
     Object.keys(sysAvail).sort().forEach(function(sys){
       html+='<option value="'+sys+'"'+(item.system===sys?' selected':'')+'>'+sys+' ('+sysAvail[sys]+' available)</option>';
@@ -5805,21 +5813,18 @@ function renderOpsSignOut(el){
   });
   
   html+='<button class="btn btn-secondary btn-sm" onclick="opsFormCache.items.push({system:\'\',qty:0});renderOps()" style="margin-bottom:16px;">+ Add System Type</button>';
-  
   html+='<div style="margin-top:8px;"><button class="btn btn-primary" onclick="opsCalcSignOut()">Calculate Loading Plan</button></div>';
   html+='<div id="opsSignOutResult" style="margin-top:16px;"></div>';
   
-  // Active sign-outs summary
+  // Active sign-outs
   var activeOuts=(S.signedOut||[]).filter(function(s){return s.status==='out';});
   if(activeOuts.length>0){
     html+='<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">';
     html+='<div style="font-size:13px;font-weight:600;margin-bottom:8px;">Active Sign-Outs</div>';
     activeOuts.forEach(function(so){
-      var items=so.items||[{system:so.system,count:so.count}];
-      var desc=items.map(function(it){return (it.count||it.qty)+' '+(it.system||'');}).join(', ');
       html+='<div class="archive-item">';
-      html+='<div class="archive-item-info"><div class="archive-item-title">'+esc(so.unit||'')+' \u2014 '+desc+'</div>';
-      html+='<div class="archive-item-meta">Date: '+(so.date||'?')+'</div></div>';
+      html+='<div class="archive-item-info"><div class="archive-item-title">'+esc(so.unit||'')+' \u2014 '+so.totalQty+' chutes</div>';
+      html+='<div class="archive-item-meta">'+esc(so.system||'')+' | Date: '+(so.date||'?')+'</div></div>';
       html+='</div>';
     });
     html+='</div>';
@@ -5830,56 +5835,43 @@ function renderOpsSignOut(el){
 }
 
 function opsCalcSignOut(){
-  var unit=document.getElementById('opsOutUnit').value.trim();
-  var date=document.getElementById('opsOutDate').value;
-  opsFormCache.unit=unit;
-  opsFormCache.date=date;
+  opsFormSave();
+  var unit=opsFormCache.unit;
+  var date=opsFormCache.date;
   
   if(!unit){toast('Enter a unit name','error');return;}
-  if(!opsFormCache.items||opsFormCache.items.length===0){toast('Add at least one system type','error');return;}
+  var validItems=(opsFormCache.items||[]).filter(function(it){return it.system&&it.qty>0;});
+  if(validItems.length===0){toast('Add at least one system with quantity','error');return;}
   
-  var validItems=opsFormCache.items.filter(function(it){return it.system&&it.qty>0;});
-  if(validItems.length===0){toast('Select system and enter quantity','error');return;}
-  
-  var result=document.getElementById('opsSignOutResult');
-  var allPlans=[];
+  // Build unified loading plan
+  var allBins=[];
   var hasError=false;
   
   validItems.forEach(function(item){
-    var system=item.system;
-    var qty=item.qty;
-    
     var bins=[];
     S.sections.forEach(function(sec){
-      if(sec.systemType!==system) return;
-      var packedRows=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;});
-      if(packedRows.length===0) return;
+      if(sec.systemType!==item.system) return;
+      var packed=sec.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._signedOut;});
+      if(packed.length===0) return;
       var earliestExp=null;
-      packedRows.forEach(function(r){
+      packed.forEach(function(r){
         if(r.expirationDate&&(!earliestExp||r.expirationDate<earliestExp)) earliestExp=r.expirationDate;
       });
-      bins.push({binLocation:sec.binLocation,available:packedRows.length,earliestExp:earliestExp});
+      bins.push({binLocation:sec.binLocation,systemType:sec.systemType,available:packed.length,earliestExp:earliestExp,secId:sec.id});
     });
     
+    var totalAvail=0;bins.forEach(function(b){totalAvail+=b.available;});
+    if(totalAvail<item.qty){hasError=true;allBins.push({system:item.system,qty:item.qty,error:true,available:totalAvail});return;}
+    
+    // Sort: longest exp first (back of truck)
     bins.sort(function(a,b){
       if(!a.earliestExp) return 1;
       if(!b.earliestExp) return -1;
       var cmp=b.earliestExp.localeCompare(a.earliestExp);
-      if(cmp!==0) return cmp;
-      return a.binLocation.localeCompare(b.binLocation);
+      return cmp!==0?cmp:a.binLocation.localeCompare(b.binLocation);
     });
     
-    var totalAvailable=0;
-    bins.forEach(function(b){totalAvailable+=b.available;});
-    
-    if(totalAvailable<qty){
-      hasError=true;
-      allPlans.push({system:system,qty:qty,error:true,available:totalAvailable,plan:[]});
-      return;
-    }
-    
-    var plan=[];
-    var remaining=qty;
+    var remaining=item.qty;
     bins.forEach(function(bin){
       if(remaining<=0) return;
       var pull=Math.min(remaining,bin.available);
@@ -5887,44 +5879,33 @@ function opsCalcSignOut(){
       var now=new Date();
       var expDate=bin.earliestExp?new Date(bin.earliestExp+'T00:00:00'):null;
       var daysLeft=expDate?Math.ceil((expDate-now)/(24*60*60*1000)):'?';
-      plan.push({bin:bin.binLocation,pull:pull,available:bin.available,earliestExp:bin.earliestExp,daysLeft:daysLeft});
+      allBins.push({system:bin.systemType,bin:bin.binLocation,pull:pull,available:bin.available,earliestExp:bin.earliestExp,daysLeft:daysLeft,secId:bin.secId});
     });
-    
-    allPlans.push({system:system,qty:qty,error:false,plan:plan});
   });
   
-  // Merge all plans into unified loading order sorted by expiration
-  var allBins=[];
-  allPlans.forEach(function(p){
-    if(p.error) return;
-    p.plan.forEach(function(row){
-      allBins.push({system:p.system,bin:row.bin,pull:row.pull,available:row.available,earliestExp:row.earliestExp,daysLeft:row.daysLeft});
-    });
-  });
-  // Sort: longest exp first (back of truck), shortest last (front)
-  allBins.sort(function(a,b){
+  // Sort unified: longest exp first
+  var errors=allBins.filter(function(b){return b.error;});
+  var plans=allBins.filter(function(b){return !b.error;});
+  plans.sort(function(a,b){
     if(!a.earliestExp) return 1;
     if(!b.earliestExp) return -1;
     var cmp=b.earliestExp.localeCompare(a.earliestExp);
-    if(cmp!==0) return cmp;
-    return a.bin.localeCompare(b.bin);
+    return cmp!==0?cmp:a.bin.localeCompare(b.bin);
   });
-
+  
+  var result=document.getElementById('opsSignOutResult');
   var html='<div style="font-size:14px;font-weight:700;margin-bottom:10px;">Loading Plan: '+esc(unit)+' | '+date+'</div>';
   
-  // Show errors first
-  allPlans.forEach(function(p){
-    if(p.error){
-      html+='<div style="padding:8px;background:var(--danger-dim);border:1px solid rgba(239,68,68,0.3);border-radius:6px;color:var(--danger);font-weight:600;margin-bottom:8px;">'+p.system+': Need '+p.qty+' but only '+p.available+' available.</div>';
-    }
+  errors.forEach(function(e){
+    html+='<div style="padding:8px;background:var(--danger-dim);border:1px solid rgba(239,68,68,0.3);border-radius:6px;color:var(--danger);font-weight:600;margin-bottom:8px;">'+e.system+': Need '+e.qty+' but only '+e.available+' available.</div>';
   });
   
-  if(allBins.length>0){
-    html+='<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Load in this order. Last loaded = front of truck (expires soonest, gets jumped first).</div>';
+  if(plans.length>0){
+    html+='<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Load in order. Last = front of truck (expires soonest, jumped first).</div>';
     html+='<table class="data-table"><thead><tr><th>Load Order</th><th>System</th><th>Bin</th><th>Pull</th><th>Available</th><th>Earliest Exp</th><th>Days Left</th></tr></thead><tbody>';
-    allBins.forEach(function(row,idx){
+    plans.forEach(function(row,idx){
       var expClass=row.daysLeft<=0?'exp-expired':row.daysLeft<=7?'exp-7':row.daysLeft<=30?'exp-30':'exp-ok';
-      var loadLabel=idx===allBins.length-1?'LAST (front)':idx===0?'FIRST (back)':'#'+(idx+1);
+      var loadLabel=idx===plans.length-1?'LAST (front)':idx===0?'FIRST (back)':'#'+(idx+1);
       html+='<tr><td style="font-weight:600;">'+loadLabel+'</td><td><span class="section-badge">'+row.system+'</span></td><td style="font-weight:600;">'+esc(row.bin)+'</td>';
       html+='<td style="font-size:18px;font-weight:700;color:var(--accent);">'+row.pull+'</td>';
       html+='<td>'+row.available+'</td><td class="'+expClass+'">'+formatDate(row.earliestExp)+'</td>';
@@ -5933,68 +5914,73 @@ function opsCalcSignOut(){
     html+='</tbody></table>';
   }
   
-  if(!hasError){
+  if(!hasError && plans.length>0){
     html+='<div style="display:flex;gap:8px;margin-top:12px;">';
     html+='<button class="btn btn-primary" onclick="opsExecuteSignOut()">Confirm Sign Out</button>';
     html+='<button class="btn btn-secondary" onclick="document.getElementById(\'opsSignOutResult\').innerHTML=\'\'">Cancel</button>';
     html+='</div>';
   }
   
-  opsSignOutData={unit:unit,date:date,items:validItems,plans:allPlans};
+  // Store for execution
+  window._opsPlan={unit:unit,date:date,items:validItems,plans:plans};
   result.innerHTML=html;
 }
 
 function opsExecuteSignOut(){
-  if(!opsSignOutData){toast('No plan','error');return;}
+  var plan=window._opsPlan;
+  if(!plan){toast('No plan','error');return;}
   if(!S.signedOut) S.signedOut=[];
   
+  var totalQty=plan.items.reduce(function(s,it){return s+it.qty;},0);
+  
   var so={
-    unit:opsSignOutData.unit,
-    date:opsSignOutData.date,
-    items:opsSignOutData.items.map(function(it){return{system:it.system,count:String(it.qty)};}),
-    system:opsSignOutData.items.map(function(it){return it.qty+' '+it.system;}).join(', '),
-    count:String(opsSignOutData.items.reduce(function(sum,it){return sum+it.qty;},0)),
-    plans:opsSignOutData.plans,
+    unit:plan.unit,
+    date:plan.date,
+    system:plan.items.map(function(it){return it.qty+' '+it.system;}).join(', '),
+    totalQty:totalQty,
+    items:plan.items.map(function(it){return{system:it.system,count:String(it.qty)};}),
+    plans:plan.plans,
     status:'out',
-    signOutTime:new Date().toISOString(),
-    scannedOut:[]
+    scannedOut:[],
+    signOutTime:new Date().toISOString()
   };
   
   S.signedOut.push(so);
+  var signOutIdx=S.signedOut.length-1;
+  
   auditLog('signout','Sign Out','Signed out to '+so.unit+': '+so.system);
   save();
   
-  var signOutIdx=S.signedOut.length-1;
   opsFormCache={unit:'',date:'',items:[]};
-  opsSignOutData=null;
+  window._opsPlan=null;
   
-  // Show scan-out screen
+  // Go to scan-out screen
   opsShowScanOut(signOutIdx);
 }
 
 function opsShowScanOut(signOutIdx){
   _activeScanOutIdx=signOutIdx;
-  sessionStorage.setItem('pms_scanOutIdx',signOutIdx);
+  sessionStorage.setItem('pms_scanOutIdx',String(signOutIdx));
   var so=S.signedOut[signOutIdx];
   if(!so) return;
-  var totalNeeded=parseInt(so.count)||0;
+  var totalNeeded=so.totalQty||parseInt(so.count)||0;
   var scanned=(so.scannedOut||[]).length;
+  
+  // Get allowed system types
+  var allowedSystems=(so.items||[]).map(function(it){return it.system;});
   
   var el=document.getElementById('opsContent');
   var html='<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:20px;">';
   html+='<h3 style="font-size:15px;margin-bottom:4px;">Scanning Out: '+esc(so.unit)+'</h3>';
-  html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">'+so.system+' | '+so.date+'</div>';
+  html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">'+esc(so.system)+' | '+so.date+'</div>';
   
-  html+='<div style="font-size:14px;font-weight:600;margin-bottom:8px;">Scanned: <span style="color:var(--accent);">'+scanned+'</span> / '+totalNeeded+'</div>';
-  
-  // Progress bar
   var pct=totalNeeded>0?Math.round((scanned/totalNeeded)*100):0;
+  html+='<div style="font-size:14px;font-weight:600;margin-bottom:8px;">Scanned: <span style="color:var(--accent);">'+scanned+'</span> / '+totalNeeded+'</div>';
   html+='<div style="height:8px;background:var(--bg-input);border-radius:4px;margin-bottom:16px;overflow:hidden;">';
-  html+='<div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:4px;transition:width 0.3s;"></div>';
-  html+='</div>';
+  html+='<div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:4px;transition:width 0.3s;"></div></div>';
   
   html+='<div style="display:flex;gap:8px;margin-bottom:16px;">';
-  html+='<input type="text" class="form-input" id="opsScanOutInput" placeholder="Scan chute leaving building..." style="flex:1;font-size:16px;padding:12px;" onkeydown="if(event.key===\'Enter\')opsScanOutChute('+signOutIdx+')">';
+  html+='<input type="text" class="form-input" id="opsScanOutInput" placeholder="Scan chute leaving..." style="flex:1;font-size:16px;padding:12px;" onkeydown="if(event.key===\'Enter\')opsScanOutChute('+signOutIdx+')">';
   html+='<button class="btn btn-primary" onclick="opsScanOutChute('+signOutIdx+')" style="padding:12px 20px;">Scan Out</button>';
   html+='</div>';
   
@@ -6008,10 +5994,9 @@ function opsShowScanOut(signOutIdx){
   }
   
   html+='<div style="display:flex;gap:8px;margin-top:16px;">';
-  html+='<button class="btn btn-primary" onclick="opsFinishScanOut('+signOutIdx+')">Done Scanning ('+(scanned>=totalNeeded?'All scanned':''+scanned+'/'+totalNeeded+'')+')</button>';
+  html+='<button class="btn btn-primary" onclick="opsFinishScanOut('+signOutIdx+')">Done Scanning</button>';
   html+='<button class="btn btn-secondary" onclick="clearScanOutState()">Back</button>';
-  html+='</div>';
-  html+='</div>';
+  html+='</div></div>';
   el.innerHTML=html;
   setTimeout(function(){var inp=document.getElementById('opsScanOutInput');if(inp)inp.focus();},100);
 }
@@ -6021,45 +6006,47 @@ function opsScanOutChute(signOutIdx){
   if(!inp) return;
   var sn=inp.value.trim();
   if(!sn) return;
-  inp.value='';
-  inp.focus();
+  inp.value='';inp.focus();
   
   var so=S.signedOut[signOutIdx];
   if(!so) return;
   if(!so.scannedOut) so.scannedOut=[];
   
-  // Check if already scanned
   if(so.scannedOut.find(function(s){return s.sn===sn;})){
-    toast(sn+' already scanned out','warning');
-    return;
+    toast(sn+' already scanned out','warning');return;
   }
   
-  // Find this chute
+  // Find chute
   var found=null;
   S.sections.forEach(function(sec){
     sec.rows.forEach(function(r){
-      if(r.serialNumber===sn) found={sec:sec,row:r};
+      if(r.serialNumber===sn&&!r._signedOut) found={sec:sec,row:r};
     });
   });
   
   if(!found){
-    toast(sn+' not found in any section','error');
-    return;
+    // Check if already signed out
+    var alreadyOut=false;
+    S.sections.forEach(function(sec){sec.rows.forEach(function(r){
+      if(r.serialNumber===sn&&r._signedOut) alreadyOut=true;
+    });});
+    if(alreadyOut){toast(sn+' is already signed out','error');return;}
+    toast(sn+' not found in any section','error');return;
   }
   
-  // Validate system type matches what was signed out
+  // Validate system type
   var allowedSystems=(so.items||[]).map(function(it){return it.system;});
-  if(allowedSystems.length>0 && allowedSystems.indexOf(found.sec.systemType)<0){
-    toast(sn+' is a '+found.sec.systemType+' — this sign-out is for '+allowedSystems.join(', '),'error');
-    return;
+  if(allowedSystems.length>0&&allowedSystems.indexOf(found.sec.systemType)<0){
+    toast(sn+' is a '+found.sec.systemType+' \u2014 this sign-out is for '+allowedSystems.join(', '),'error');return;
   }
   
-  so.scannedOut.push({
-    sn:sn,
-    bin:found.sec.binLocation,
-    system:found.sec.systemType,
-    time:new Date().toLocaleTimeString()
-  });
+  // Mark chute as signed out
+  found.row._signedOut=true;
+  found.row._signedOutTo=so.unit;
+  found.row._signedOutDate=so.date;
+  found.row._signOutIdx=signOutIdx;
+  
+  so.scannedOut.push({sn:sn,bin:found.sec.binLocation,system:found.sec.systemType,time:new Date().toLocaleTimeString()});
   save();
   toast(sn+' scanned out from '+found.sec.binLocation,'success',2000);
   opsShowScanOut(signOutIdx);
@@ -6070,12 +6057,9 @@ function opsFinishScanOut(signOutIdx){
   sessionStorage.removeItem('pms_scanOutIdx');
   var so=S.signedOut[signOutIdx];
   var scanned=(so.scannedOut||[]).length;
-  var total=parseInt(so.count)||0;
-  if(scanned<total){
-    toast('Signed out with '+scanned+'/'+total+' scanned','warning');
-  } else {
-    toast('All '+total+' chutes scanned out','success');
-  }
+  var total=so.totalQty||parseInt(so.count)||0;
+  if(scanned<total) toast('Signed out '+scanned+'/'+total+' scanned','warning');
+  else toast('All '+total+' chutes scanned out','success');
   save();
   renderOps();
 }
@@ -6086,19 +6070,17 @@ function renderOpsSignIn(el){
   html+='<h3 style="font-size:15px;margin-bottom:12px;">Sign In Mode</h3>';
   
   var activeOuts=(S.signedOut||[]).filter(function(s){return s.status==='out';});
-  
   if(activeOuts.length===0){
     html+='<div style="text-align:center;padding:30px;color:var(--text-muted);">No chutes currently signed out</div>';
   } else {
     html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Select a sign-out to process returns.</div>';
     activeOuts.forEach(function(so){
       var actualIdx=S.signedOut.indexOf(so);
-      var items=so.items||[{system:so.system,count:so.count}];
-      var desc=items.map(function(it){return (it.count||0)+' '+(it.system||'');}).join(', ');
+      var scanned=(so.scannedOut||[]).length;
       html+='<div class="archive-item" style="cursor:pointer;" onclick="opsStartSignIn('+actualIdx+')">';
       html+='<div class="archive-item-info">';
-      html+='<div class="archive-item-title">'+esc(so.unit||'Unknown')+' \u2014 '+desc+'</div>';
-      html+='<div class="archive-item-meta">Signed out: '+(so.date||'?')+'</div>';
+      html+='<div class="archive-item-title">'+esc(so.unit||'Unknown')+' \u2014 '+scanned+' chutes</div>';
+      html+='<div class="archive-item-meta">'+esc(so.system||'')+' | Signed out: '+(so.date||'?')+'</div>';
       html+='</div>';
       html+='<div class="archive-item-actions"><button class="btn btn-primary btn-sm">Process Return</button></div>';
       html+='</div>';
@@ -6110,42 +6092,43 @@ function renderOpsSignIn(el){
 
 function opsStartSignIn(signOutIdx){
   _activeSignInIdx=signOutIdx;
-  sessionStorage.setItem('pms_signInIdx',signOutIdx);
+  sessionStorage.setItem('pms_signInIdx',String(signOutIdx));
+  S._opsSignInLog=[];
   var so=S.signedOut[signOutIdx];
   if(!so) return;
-  var totalOut=parseInt(so.count)||0;
-  S._opsSignInLog=[];
+  var totalOut=(so.scannedOut||[]).length;
   
   var el=document.getElementById('opsContent');
   var html='<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:20px;">';
   html+='<h3 style="font-size:15px;margin-bottom:4px;">Sign In: '+esc(so.unit||'')+'</h3>';
-  var items=so.items||[{system:so.system,count:so.count}];
-  var desc=items.map(function(it){return (it.count||0)+' '+(it.system||'');}).join(', ');
-  html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">'+desc+' signed out on '+(so.date||'?')+'</div>';
+  html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">'+totalOut+' chutes out ('+esc(so.system||'')+') since '+(so.date||'?')+'</div>';
   
-  html+='<div style="display:flex;gap:8px;margin-bottom:16px;">';
-  html+='<button class="btn btn-primary" id="signInLiveBtn" onclick="opsSignInSubMode('+signOutIdx+',\'live\')" style="flex:1;">Live / Packed</button>';
-  html+='<button class="btn btn-secondary" id="signInPoppedBtn" onclick="opsSignInSubMode('+signOutIdx+',\'popped\')" style="flex:1;">Popped</button>';
-  html+='</div>';
-  
+  // Quick actions
   html+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">';
   html+='<button class="btn btn-secondary btn-sm" onclick="opsQuickSignIn('+signOutIdx+',\'all_live\')">All Returned Live</button>';
   html+='<button class="btn btn-secondary btn-sm" onclick="opsQuickSignIn('+signOutIdx+',\'all_popped\')">All Popped</button>';
   html+='</div>';
   
+  // Split entry
   html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">';
   html+='<div class="form-group"><label class="form-label">Live / Returned</label><input type="number" class="form-input" id="opsLiveCount" placeholder="0" min="0" max="'+totalOut+'" value="0" oninput="opsUpdatePopped('+totalOut+')"></div>';
   html+='<div class="form-group"><label class="form-label">Popped</label><input type="number" class="form-input" id="opsPoppedCount" value="'+totalOut+'" readonly style="background:var(--bg-card);"></div>';
   html+='</div>';
   
-  html+='<div id="opsSignInScanArea"><div style="font-size:12px;font-weight:600;margin-bottom:6px;">Scan live chutes to return to bins</div><div style="display:flex;gap:8px;margin-bottom:8px;"><input type="text" class="form-input" id="opsSignInScan" placeholder="Scan serial number..." style="flex:1;font-size:14px;padding:10px;" onkeydown="if(event.key===\'Enter\')opsScanSignIn('+signOutIdx+')"><button class="btn btn-primary" onclick="opsScanSignIn('+signOutIdx+')">Scan In</button></div></div>';
+  // Scan area for live returns
+  html+='<div style="font-size:12px;font-weight:600;margin-bottom:6px;">Scan live chutes returning</div>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:8px;">';
+  html+='<input type="text" class="form-input" id="opsSignInScan" placeholder="Scan serial number..." style="flex:1;font-size:14px;padding:10px;" onkeydown="if(event.key===\'Enter\')opsScanSignIn('+signOutIdx+')">';
+  html+='<button class="btn btn-primary" onclick="opsScanSignIn('+signOutIdx+')">Scan In</button>';
+  html+='</div>';
+  html+='<div id="opsSignInLogArea"></div>';
   
-  html+='<div style="display:flex;gap:8px;margin-top:12px;">';
+  html+='<div style="display:flex;gap:8px;margin-top:16px;">';
   html+='<button class="btn btn-primary" onclick="opsProcessSignIn('+signOutIdx+')">Confirm Sign In</button>';
-  html+='<button class="btn btn-secondary" onclick="renderOps()">Back</button>';
-  html+='</div>';
-  html+='</div>';
+  html+='<button class="btn btn-secondary" onclick="clearSignInState()">Back</button>';
+  html+='</div></div>';
   el.innerHTML=html;
+  setTimeout(function(){var inp=document.getElementById('opsSignInScan');if(inp)inp.focus();},100);
 }
 
 function opsUpdatePopped(total){
@@ -6155,79 +6138,31 @@ function opsUpdatePopped(total){
   document.getElementById('opsPoppedCount').value=total-live;
 }
 
-function opsSignInSubMode(signOutIdx,mode){
-  document.getElementById('signInLiveBtn').className='btn '+(mode==='live'?'btn-primary':'btn-secondary');
-  document.getElementById('signInPoppedBtn').className='btn '+(mode==='popped'?'btn-primary':'btn-secondary');
-  var area=document.getElementById('opsSignInScanArea');
-  if(!area) return;
-  var so=S.signedOut[signOutIdx];
-  
-  if(mode==='live'){
-    var html='<div style="font-size:12px;font-weight:600;margin-bottom:6px;">Scan live chutes to return to bins</div>';
-    html+='<div style="display:flex;gap:8px;margin-bottom:8px;">';
-    html+='<input type="text" class="form-input" id="opsSignInScan" placeholder="Scan serial number..." style="flex:1;font-size:14px;padding:10px;" onkeydown="if(event.key===\'Enter\')opsScanSignIn('+signOutIdx+')">';
-    html+='<button class="btn btn-primary" onclick="opsScanSignIn('+signOutIdx+')">Scan In</button>';
-    html+='</div>';
-    if(!S._opsSignInLog) S._opsSignInLog=[];
-    if(S._opsSignInLog.length>0){
-      html+='<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">';
-      html+='<table class="data-table"><thead><tr><th>S/N</th><th>Return To</th><th>Exp Status</th></tr></thead><tbody>';
-      S._opsSignInLog.slice().reverse().forEach(function(e){
-        html+='<tr><td style="font-weight:600;">'+esc(e.sn)+'</td><td>'+esc(e.bin)+'</td><td style="color:'+e.expColor+';">'+e.expStatus+'</td></tr>';
-      });
-      html+='</tbody></table></div>';
-    }
-    area.innerHTML=html;
-    setTimeout(function(){var inp=document.getElementById('opsSignInScan');if(inp)inp.focus();},100);
-  } else {
-    var total=parseInt(so.count)||0;
-    var live=parseInt(document.getElementById('opsLiveCount').value)||0;
-    var popped=total-live;
-    var html='<div style="font-size:12px;font-weight:600;margin-bottom:6px;">Popped Chutes</div>';
-    html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Confirm count. These go to the popped tracker.</div>';
-    html+='<div style="font-size:28px;font-weight:700;color:var(--accent);text-align:center;padding:16px;">'+popped+' popped</div>';
-    area.innerHTML=html;
-  }
-}
-
 function opsScanSignIn(signOutIdx){
   var inp=document.getElementById('opsSignInScan');
   if(!inp) return;
   var sn=inp.value.trim();
   if(!sn) return;
-  inp.value='';
-  inp.focus();
+  inp.value='';inp.focus();
   if(!S._opsSignInLog) S._opsSignInLog=[];
   
-  // Validate: is this chute actually signed out?
   var so=S.signedOut[signOutIdx];
-  var found=null;
-  S.sections.forEach(function(sec){
-    sec.rows.forEach(function(r){
-      if(r.serialNumber===sn) found={sec:sec,row:r};
-    });
-  });
   
-  // Check if serial exists at all
-  if(!found&&!S.masterInventory[sn]){
-    toast(sn+' not found in system','error');
-    return;
+  // Must have been scanned out with this sign-out
+  if(!so.scannedOut||!so.scannedOut.find(function(s){return s.sn===sn;})){
+    toast(sn+' was not scanned out with this sign-out','error');return;
   }
   
-  // Check if this chute was actually scanned out with this sign-out
-  if(so.scannedOut&&so.scannedOut.length>0){
-    var wasScannedOut=so.scannedOut.find(function(s){return s.sn===sn;});
-    if(!wasScannedOut){
-      toast(sn+' was not scanned out with this sign-out','error');
-      return;
-    }
-  }
-  
-  // Check if already scanned in this session
+  // Already scanned in?
   if(S._opsSignInLog.find(function(e){return e.sn===sn;})){
-    toast(sn+' already scanned in this session','warning');
-    return;
+    toast(sn+' already scanned in','warning');return;
   }
+  
+  // Find the chute
+  var found=null;
+  S.sections.forEach(function(sec){sec.rows.forEach(function(r){
+    if(r.serialNumber===sn) found={sec:sec,row:r};
+  });});
   
   var now=new Date();
   if(found){
@@ -6238,25 +6173,31 @@ function opsScanSignIn(signOutIdx){
     S._opsSignInLog.push({sn:sn,bin:found.sec.binLocation+' ('+found.sec.systemType+')',expStatus:expStatus,expColor:expColor});
     toast(sn+' \u2192 '+found.sec.binLocation+(daysLeft<=30?' \u26A0 '+expStatus:''),'success',3000);
   } else {
-    S._opsSignInLog.push({sn:sn,bin:'In inventory, no bin assigned',expStatus:'Unknown',expColor:'var(--text-muted)'});
-    toast(sn+' found in inventory but not assigned to a bin','warning');
+    S._opsSignInLog.push({sn:sn,bin:'Unknown',expStatus:'?',expColor:'var(--text-muted)'});
   }
   
-  var liveInput=document.getElementById('opsLiveCount');
-  opsSignInSubMode(signOutIdx,'live');
+  // Update log display
+  var logArea=document.getElementById('opsSignInLogArea');
+  if(logArea&&S._opsSignInLog.length>0){
+    var html='<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;margin-top:8px;">';
+    html+='<table class="data-table"><thead><tr><th>S/N</th><th>Return To</th><th>Exp Status</th></tr></thead><tbody>';
+    S._opsSignInLog.slice().reverse().forEach(function(e){
+      html+='<tr><td style="font-weight:600;">'+esc(e.sn)+'</td><td>'+esc(e.bin)+'</td><td style="color:'+e.expColor+';">'+e.expStatus+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+    logArea.innerHTML=html;
+  }
 }
 
 function opsQuickSignIn(signOutIdx,mode){
   var so=S.signedOut[signOutIdx];
   if(!so) return;
-  var total=parseInt(so.count)||0;
+  var total=(so.scannedOut||[]).length;
   if(mode==='all_live'){
     document.getElementById('opsLiveCount').value=total;
     document.getElementById('opsPoppedCount').value=0;
-    S._quickAllLive=true;
     toast('All '+total+' marked as returned live','success');
   } else {
-    S._quickAllLive=false;
     document.getElementById('opsLiveCount').value=0;
     document.getElementById('opsPoppedCount').value=total;
     toast('All '+total+' marked as popped','success');
@@ -6266,46 +6207,44 @@ function opsQuickSignIn(signOutIdx,mode){
 function opsProcessSignIn(signOutIdx){
   var so=S.signedOut[signOutIdx];
   if(!so) return;
-  var total=parseInt(so.count)||0;
+  var totalOut=(so.scannedOut||[]).length;
   var live=parseInt(document.getElementById('opsLiveCount').value)||0;
-  var popped=total-live;
+  var popped=totalOut-live;
+  var scannedIn=(S._opsSignInLog||[]).length;
   
-  // Validate: if live > 0, must have scanned that many in (or used quick all-live)
-  var scannedInCount=(S._opsSignInLog||[]).length;
-  if(live>0 && scannedInCount>0 && scannedInCount<live){
-    toast('You scanned '+scannedInCount+' but marked '+live+' as live. Scan all live chutes or adjust the count.','error');
-    return;
+  // Validate
+  if(live>0&&scannedIn>0&&scannedIn<live){
+    toast('Scanned '+scannedIn+' but marked '+live+' live. Scan all or adjust count.','error');return;
   }
-  // If chutes were scanned out, live chutes should have been scanned in
-  if(live>0 && !S._quickAllLive && so.scannedOut && so.scannedOut.length>0 && scannedInCount===0){
-    showConfirm('Confirm Without Scanning','You marked '+live+' as live but did not scan any in. Process anyway?',
-      [{label:'Go Back',cls:'btn-secondary',fn:function(){}},
-       {label:'Process Anyway',cls:'btn-primary',fn:function(){
-         doProcessSignIn(signOutIdx,live,popped);
-       }}]);
-    return;
-  }
-  doProcessSignIn(signOutIdx,live,popped);
-}
-
-function doProcessSignIn(signOutIdx,live,popped){
-  S._quickAllLive=false;
-  _activeSignInIdx=null;
-  sessionStorage.removeItem('pms_signInIdx');
-  var so=S.signedOut[signOutIdx];
-  if(!so) return;
   
+  // Unmark live chutes (return to bins)
+  var scannedSNs=(S._opsSignInLog||[]).map(function(e){return e.sn;});
+  // If all live and not individually scanned, unmark all
+  if(live===totalOut&&scannedIn===0){
+    (so.scannedOut||[]).forEach(function(s){
+      S.sections.forEach(function(sec){sec.rows.forEach(function(r){
+        if(r.serialNumber===s.sn){r._signedOut=false;delete r._signedOutTo;delete r._signedOutDate;delete r._signOutIdx;}
+      });});
+    });
+  } else {
+    // Unmark individually scanned chutes
+    scannedSNs.forEach(function(sn){
+      S.sections.forEach(function(sec){sec.rows.forEach(function(r){
+        if(r.serialNumber===sn){r._signedOut=false;delete r._signedOutTo;delete r._signedOutDate;delete r._signOutIdx;}
+      });});
+    });
+  }
+  
+  // Popped chutes stay marked as signed out (they're gone)
+  // Add to popped tracker
   if(popped>0){
-    // Add to popped tracker per system
-    var items=so.items||[{system:so.system||'T-11',count:so.count}];
+    var items=so.items||[{system:'T-11',count:String(totalOut)}];
     items.forEach(function(it){
       var sys=it.system||'T-11';
       if(!S.statusCounts[sys]) S.statusCounts[sys]={};
       if(!S.statusCounts[sys].popped) S.statusCounts[sys].popped=[];
-      var poppedForSys=Math.min(popped,parseInt(it.count)||0);
-      if(poppedForSys>0){
-        S.statusCounts[sys].popped.push({bin:so.unit+' '+so.date,count:poppedForSys});
-      }
+      var poppedForSys=Math.min(popped,parseInt(it.count)||totalOut);
+      if(poppedForSys>0) S.statusCounts[sys].popped.push({bin:so.unit+' '+so.date,count:poppedForSys});
     });
   }
   
@@ -6314,6 +6253,8 @@ function doProcessSignIn(signOutIdx,live,popped){
   so.liveReturned=live;
   so.poppedCount=popped;
   
+  _activeSignInIdx=null;
+  sessionStorage.removeItem('pms_signInIdx');
   auditLog('signout','Sign In','Returned '+so.unit+': '+live+' live, '+popped+' popped');
   S._opsSignInLog=[];
   save();
