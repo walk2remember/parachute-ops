@@ -6316,20 +6316,32 @@ function opsProcessSignIn(signOutIdx){
   
   // Unmark live chutes (return to bins)
   var scannedSNs=(S._opsSignInLog||[]).map(function(e){return e.sn;});
-  // If all live and not individually scanned, unmark all
-  if(live===totalOut&&scannedIn===0){
-    (so.scannedOut||[]).forEach(function(s){
-      S.sections.forEach(function(sec){sec.rows.forEach(function(r){
-        if(r.serialNumber===s.sn){r._signedOut=false;delete r._signedOutTo;delete r._signedOutDate;delete r._signOutIdx;}
-      });});
-    });
-  } else {
+  var allOutSNs=(so.scannedOut||[]).map(function(s){return s.sn;});
+  
+  if(scannedIn>0){
     // Unmark individually scanned chutes
     scannedSNs.forEach(function(sn){
       S.sections.forEach(function(sec){sec.rows.forEach(function(r){
         if(r.serialNumber===sn){r._signedOut=false;delete r._signedOutTo;delete r._signedOutDate;delete r._signOutIdx;}
       });});
     });
+  } else if(live>0){
+    // No individual scanning - auto-select live chutes (newest expiration first = most shelf life)
+    var outRows=[];
+    S.sections.forEach(function(sec){sec.rows.forEach(function(r){
+      if(r._signedOut && r._signOutIdx===signOutIdx){
+        outRows.push(r);
+      }
+    });});
+    // Sort: newest expiration first (these come back live)
+    outRows.sort(function(a,b){return (b.expirationDate||'').localeCompare(a.expirationDate||'');});
+    // Unmark the first 'live' number of chutes
+    for(var li=0;li<Math.min(live,outRows.length);li++){
+      outRows[li]._signedOut=false;
+      delete outRows[li]._signedOutTo;
+      delete outRows[li]._signedOutDate;
+      delete outRows[li]._signOutIdx;
+    }
   }
   
   // Popped chutes stay marked as signed out (they're gone)
