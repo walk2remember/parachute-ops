@@ -1403,7 +1403,6 @@ async function saveToDB() {
         var { data: newSec } = await sbClient.from('pms_sections').insert(secRow).select();
         if (newSec && newSec[0]) {
           sec._dbId = newSec[0].id;
-          sec.id = newSec[0].id;
         }
       }
       
@@ -2574,7 +2573,7 @@ function addRow(id){
     tmp.innerHTML=rowHTML(s,s.rows[idx],idx);
     const tr=tmp.firstElementChild; tb.appendChild(tr);
     const card=document.querySelector(`.section-card[data-section-id="${id}"]`);
-    if(card){const m=card.querySelector('.section-meta');if(m)m.textContent=`${s.rows.length} / ${s.maxChutes} chutes`;}
+    if(card){const m=card.querySelector('.section-meta');if(m){var pc=s.rows.filter(function(r){return r.serialNumber&&r.packer&&r.ip;}).length;m.textContent=pc+' packed / '+s.rows.length+' entries / '+s.maxChutes+' max';}}
     tr.querySelector('input[type="text"]')?.focus();
   } else renderSections();
 }
