@@ -4112,7 +4112,7 @@ function renderPSR(){
     (function(){
       (S.signedOut||[]).filter(function(s){return s.status==='out';}).forEach(function(so){
         var count=(so.scannedOut||[]).length;
-        html+=\`<tr><td><strong>\${esc(so.unit||'')}</strong></td><td>\${esc(so.system||'')}</td><td><strong>\${count}</strong></td><td>\${so.date||''}</td></tr>\`;
+        html+='<tr><td><strong>'+esc(so.unit||'')+'</strong></td><td>'+esc(so.system||'')+'</td><td><strong>'+count+'</strong></td><td>'+(so.date||'')+'</td></tr>';
       });
     })();
   } else {
