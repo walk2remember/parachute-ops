@@ -2535,8 +2535,8 @@ function rowHTML(sec,r,i){
   return `<tr class="${locked?'row-locked':''}" style="${rowStyle}${soStyle}" title="${r._signedOut?'Signed out to '+(r._signedOutTo||'?')+' on '+(r._signedOutDate||'?'):''}">
     <td><input type="checkbox" class="row-cb" data-sec="${sec.id}" data-ri="${i}" tabindex="-1"></td>
     <td><input type="text" value="${esc(r.serialNumber)}" placeholder="S/N" onchange="onSN(${sec.id},${i},this.value)" class="tab-field" ${dis}></td>
-    <td><input type="text" value="${esc(r.dom)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'dom')" onkeydown="onDateKey(event,this,${sec.id},${i},'dom')" style="width:65px;" class="tab-field" ${dis}></td>
-    <td><input type="text" value="${esc(r.pis)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'pis')" onkeydown="onDateKey(event,this,${sec.id},${i},'pis')" style="width:65px;" class="tab-field" ${dis}></td>
+    <td><input type="text" value="${esc(r.dom)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'dom')" onchange="onDateBlur(this,${sec.id},${i},'dom')" onkeydown="onDateKey(event,this,${sec.id},${i},'dom')" style="width:65px;" class="tab-field" ${dis}></td>
+    <td><input type="text" value="${esc(r.pis)}" placeholder="MMYY" onblur="onDateBlur(this,${sec.id},${i},'pis')" onchange="onDateBlur(this,${sec.id},${i},'pis')" onkeydown="onDateKey(event,this,${sec.id},${i},'pis')" style="width:65px;" class="tab-field" ${dis}></td>
     <td><span class="cell-readonly" style="${osdColor}">${osdDisplay}</span></td>
     <td><input type="text" value="${esc(r.dbag)}" placeholder="D-Bag" onchange="upd(${sec.id},${i},'dbag',this.value)" class="tab-field" ${dis}></td>
     <td><input type="text" list="packer-list" value="${esc(r.packer)}" placeholder="Packer" onchange="onPkr(${sec.id},${i},this.value,this)" class="tab-field" ${dis}></td>
@@ -6569,10 +6569,9 @@ document.addEventListener('keydown',function(e){
   if(idx<0) return;
   var next=e.shiftKey?idx-1:idx+1;
   if(next>=0&&next<fields.length){
-    // Trigger change on current field first
-    if(el.value!==el.defaultValue){
-      el.dispatchEvent(new Event('change',{bubbles:true}));
-    }
+    // Trigger change/blur on current field first
+    el.dispatchEvent(new Event('blur',{bubbles:true}));
+    el.dispatchEvent(new Event('change',{bubbles:true}));
     // Store target position for after any DOM rebuild
     var secCard=el.closest('.section-card');
     var secId=secCard?secCard.dataset.sectionId:'';
