@@ -6369,14 +6369,36 @@ function opsProcessSignIn(signOutIdx){
   var scannedIn=(S._opsSignInLog||[]).length;
   var isMulti=document.getElementById('opsSignInMulti')&&document.getElementById('opsSignInMulti').value==='1';
   
-  // Validate scanned vs declared
-  if(scannedIn>0){
-    // Scans override manual counts - use scan count as live
-    live=scannedIn;
-    popped=totalOut-live;
-    document.getElementById('opsLiveCount').value=live;
-    document.getElementById('opsPoppedCount').value=popped;
+  // If all popped - no scanning needed
+  if(live===0){
+    doFinalProcessSignIn(signOutIdx,0,totalOut,0,isMulti);
+    return;
   }
+  
+  // If all live - no scanning needed (all come back)
+  if(popped===0 && scannedIn===0){
+    doFinalProcessSignIn(signOutIdx,totalOut,0,0,isMulti);
+    return;
+  }
+  
+  // Mixed split - MUST scan all live chutes
+  if(scannedIn<live){
+    var missing=live-scannedIn;
+    toast('Missing '+missing+' chute'+(missing>1?'s':'')+' to scan in. You said '+live+' live but only scanned '+scannedIn+'.','error');
+    return;
+  }
+  
+  // Scans match or exceed - use scan count
+  live=scannedIn;
+  popped=totalOut-live;
+  
+  doFinalProcessSignIn(signOutIdx,live,popped,scannedIn,isMulti);
+}
+
+function doFinalProcessSignIn(signOutIdx,live,popped,scannedIn,isMulti){
+  var so=S.signedOut[signOutIdx];
+  if(!so) return;
+  var totalOut=(so.scannedOut||[]).length;
   
   // Get per-system breakdown
   var liveBySys={};
@@ -6401,30 +6423,13 @@ function opsProcessSignIn(signOutIdx){
   
   var liveChutes=[];
   if(scannedIn>0){
-    // Individually scanned
+    // Individually scanned - only these come back
     liveChutes=allScannedOut.filter(function(s){return scannedInSNs.indexOf(s.sn)>=0;});
-  } else if(live>0){
-    if(isMulti){
-      // Per-system selection: pick newest expiration per system
-      Object.keys(liveBySys).forEach(function(sys){
-        var sysChutes=allScannedOut.filter(function(s){return s.system===sys;});
-        sysChutes.sort(function(a,b){
-          var expA=(a.rowData&&a.rowData.expirationDate)||'';
-          var expB=(b.rowData&&b.rowData.expirationDate)||'';
-          return expB.localeCompare(expA);
-        });
-        liveChutes=liveChutes.concat(sysChutes.slice(0,liveBySys[sys]));
-      });
-    } else {
-      // Single system: newest expiration first
-      var sorted=allScannedOut.slice().sort(function(a,b){
-        var expA=(a.rowData&&a.rowData.expirationDate)||'';
-        var expB=(b.rowData&&b.rowData.expirationDate)||'';
-        return expB.localeCompare(expA);
-      });
-      liveChutes=sorted.slice(0,live);
-    }
+  } else if(live>0 && popped===0){
+    // All live, none popped - all come back
+    liveChutes=allScannedOut.slice();
   }
+  // If mixed split with no scans, liveChutes stays empty (blocked by validation)
   
   // Put live chutes back
   var liveSNs=liveChutes.map(function(ch){return ch.sn;});
