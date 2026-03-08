@@ -6274,18 +6274,15 @@ function opsScanSignIn(signOutIdx){
   
   var so=S.signedOut[signOutIdx];
   
-  // Must have been scanned out with this sign-out
   var scannedRecord=(so.scannedOut||[]).find(function(s){return s.sn===sn;});
   if(!scannedRecord){
     toast(sn+' was not scanned out with this sign-out','error');return;
   }
   
-  // Already scanned in?
   if(S._opsSignInLog.find(function(e){return e.sn===sn;})){
     toast(sn+' already scanned in','warning');return;
   }
   
-  // Get expiration from stored rowData
   var now=new Date();
   var expDate=scannedRecord.rowData&&scannedRecord.rowData.expirationDate?new Date(scannedRecord.rowData.expirationDate+'T00:00:00'):null;
   var daysLeft=expDate?Math.ceil((expDate-now)/(24*60*60*1000)):999;
@@ -6293,20 +6290,31 @@ function opsScanSignIn(signOutIdx){
   var expColor=daysLeft<=0?'var(--danger)':daysLeft<=7?'var(--warning-orange)':daysLeft<=30?'var(--warning)':'var(--success)';
   var binName=scannedRecord.bin+' ('+scannedRecord.system+')';
   
-  S._opsSignInLog.push({sn:sn,bin:binName,expStatus:expStatus,expColor:expColor});
+  S._opsSignInLog.push({sn:sn,bin:binName,system:scannedRecord.system,expStatus:expStatus,expColor:expColor});
   toast(sn+' \u2192 '+scannedRecord.bin+(daysLeft<=30?' \u26A0 '+expStatus:''),'success',3000);
-  
-  // Update log display
+  opsRenderSignInLog(signOutIdx);
+}
+
+function opsRemoveScannedIn(signOutIdx,sn){
+  if(!S._opsSignInLog) return;
+  S._opsSignInLog=S._opsSignInLog.filter(function(e){return e.sn!==sn;});
+  opsRenderSignInLog(signOutIdx);
+  toast(sn+' removed','warning',2000);
+}
+
+function opsRenderSignInLog(signOutIdx){
   var logArea=document.getElementById('opsSignInLogArea');
-  if(logArea&&S._opsSignInLog.length>0){
-    var html='<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;margin-top:8px;">';
-    html+='<table class="data-table"><thead><tr><th>S/N</th><th>Return To</th><th>Exp Status</th></tr></thead><tbody>';
-    S._opsSignInLog.slice().reverse().forEach(function(e){
-      html+='<tr><td style="font-weight:600;">'+esc(e.sn)+'</td><td>'+esc(e.bin)+'</td><td style="color:'+e.expColor+';">'+e.expStatus+'</td></tr>';
-    });
-    html+='</tbody></table></div>';
-    logArea.innerHTML=html;
-  }
+  if(!logArea) return;
+  if(!S._opsSignInLog||S._opsSignInLog.length===0){logArea.innerHTML='';return;}
+  var html='<div style="font-size:12px;font-weight:600;margin-top:8px;margin-bottom:4px;">Scanned In: '+S._opsSignInLog.length+'</div>';
+  html+='<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">';
+  html+='<table class="data-table"><thead><tr><th>S/N</th><th>Return To</th><th>Exp</th><th></th></tr></thead><tbody>';
+  S._opsSignInLog.slice().reverse().forEach(function(e){
+    html+='<tr><td style="font-weight:600;">'+esc(e.sn)+'</td><td>'+esc(e.bin)+'</td><td style="color:'+e.expColor+';">'+e.expStatus+'</td>';
+    html+='<td style="width:30px;"><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;" onclick="opsRemoveScannedIn('+signOutIdx+',\''+esc(e.sn)+'\')" title="Remove">\u2715</button></td></tr>';
+  });
+  html+='</tbody></table></div>';
+  logArea.innerHTML=html;
 }
 
 function opsQuickSignIn(signOutIdx,mode){
@@ -6358,8 +6366,12 @@ function opsProcessSignIn(signOutIdx){
   var isMulti=document.getElementById('opsSignInMulti')&&document.getElementById('opsSignInMulti').value==='1';
   
   // Validate scanned vs declared
-  if(live>0&&scannedIn>0&&scannedIn<live){
-    toast('Scanned '+scannedIn+' but marked '+live+' live. Scan all or adjust count.','error');return;
+  if(scannedIn>0){
+    // Scans override manual counts - use scan count as live
+    live=scannedIn;
+    popped=totalOut-live;
+    document.getElementById('opsLiveCount').value=live;
+    document.getElementById('opsPoppedCount').value=popped;
   }
   
   // Get per-system breakdown
