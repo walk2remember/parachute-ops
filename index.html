@@ -4109,13 +4109,30 @@ function renderPSR(){
     <div class="psr-section-title">📋 Signed Out Chutes <button class="btn btn-sm btn-secondary" onclick="addSignedOut()" style="margin-left:8px;">+ Add</button></div>`;
   var activeSignedOut=(S.signedOut||[]).filter(function(s){return s.status==='out';});
   if(activeSignedOut.length>0||totalSignedOut>0){
-    html+=`<table class="psr-table"><thead><tr><th>Unit</th><th>System</th><th>Qty</th><th></th></tr></thead><tbody>`;
-    (function(){
-      (S.signedOut||[]).filter(function(s){return s.status==='out';}).forEach(function(so){
-        var count=((so.scannedOut||[]).length)||(parseInt(so.count)||0);
-        html+='<tr><td><strong>'+esc(so.unit||'')+'</strong></td><td>'+esc(so.system||'')+'</td><td><strong>'+count+'</strong></td><td>'+(so.date||'')+'</td></tr>';
-      });
-    })();
+    html+=`<table class="psr-table"><thead><tr><th>Unit</th><th>System</th><th>Qty</th><th>Date</th><th></th></tr></thead><tbody>`;
+    var soIdx=0;
+    (S.signedOut||[]).forEach(function(so,i){
+      if(so.status!=='out'&&so.status) return;
+      var systems=getUnitSystems();
+      var sysOpts='<option value="">-- Type --</option>';
+      systems.forEach(function(sys){ sysOpts+='<option value="'+sys+'"'+(so.system===sys?' selected':'')+'>'+sys+'</option>'; });
+      var scannedCount=(so.scannedOut||[]).length;
+      var isFromOps=scannedCount>0;
+      if(isFromOps){
+        // From Operations - show as read-only
+        html+='<tr><td><strong>'+esc(so.unit||'')+'</strong></td><td>'+esc(so.system||'')+'</td><td><strong>'+scannedCount+'</strong></td><td>'+(so.date||'')+'</td><td><button class="row-action-btn delete" onclick="delSignedOut('+i+')" title="Remove">\u{1F5D1}</button></td></tr>';
+      } else {
+        // Manual entry - editable
+        var inputStyle='background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:4px 8px;font-size:12px;width:100%;outline:none;font-family:inherit;';
+        html+='<tr>';
+        html+='<td><input type="text" value="'+esc(so.unit||'')+'" placeholder="Unit" onchange="updSignedOut('+i+',\'unit\',this.value)" style="'+inputStyle+'"></td>';
+        html+='<td style="width:110px;"><select onchange="updSignedOut('+i+',\'system\',this.value)" style="'+inputStyle+'">'+sysOpts+'</select></td>';
+        html+='<td style="width:80px;"><input type="number" value="'+(so.count||'')+'" min="0" placeholder="#" onchange="updSignedOut('+i+',\'count\',this.value)" style="'+inputStyle+'width:60px;text-align:center;"></td>';
+        html+='<td style="width:120px;"><input type="date" value="'+(so.date||'')+'" onchange="updSignedOut('+i+',\'date\',this.value)" style="'+inputStyle+'color-scheme:dark;"></td>';
+        html+='<td style="width:40px;"><button class="row-action-btn delete" onclick="delSignedOut('+i+')" title="Remove">\u{1F5D1}</button></td>';
+        html+='</tr>';
+      }
+    });
   } else {
     html+=`<div style="color:var(--text-muted);font-size:12px;padding:8px;">No chutes signed out. Click + Add to track.</div>`;
   }
@@ -4390,12 +4407,10 @@ function delSnapshot(idx){
     }}]);
 }
 function addSignedOut(){
-  try{
   if(!S.signedOut) S.signedOut=[];
   auditLog('signout','Sign Out','Added signed out entry');
   S.signedOut.push({unit:'',system:'',count:'',status:'out',scannedOut:[],date:new Date().toISOString().split('T')[0]});
   save(); renderPSR();
-  }catch(e){alert('addSignedOut error: '+e.message);}
 }
 function updSignedOut(idx,fld,val){
   if(!S.signedOut?.[idx]) return;
