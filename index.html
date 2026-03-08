@@ -6166,9 +6166,18 @@ function opsStartSignIn(signOutIdx){
   if(!so) return;
   var totalOut=(so.scannedOut||[]).length;
   
+  // Group scanned out by system type
+  var bySystem={};
+  (so.scannedOut||[]).forEach(function(s){
+    if(!bySystem[s.system]) bySystem[s.system]=0;
+    bySystem[s.system]++;
+  });
+  var systemTypes=Object.keys(bySystem).sort();
+  var multiSystem=systemTypes.length>1;
+  
   var el=document.getElementById('opsContent');
   var html='<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:20px;">';
-  html+='<h3 style="font-size:15px;margin-bottom:4px;">Sign In: '+esc(so.unit||'')+'</h3>';
+  html+='<h3 style="font-size:15px;margin-bottom:4px;">Return: '+esc(so.unit||'')+'</h3>';
   html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">'+totalOut+' chutes out ('+esc(so.system||'')+') since '+(so.date||'?')+'</div>';
   
   // Quick actions
@@ -6177,26 +6186,75 @@ function opsStartSignIn(signOutIdx){
   html+='<button class="btn btn-secondary btn-sm" onclick="opsQuickSignIn('+signOutIdx+',\'all_popped\')">All Popped</button>';
   html+='</div>';
   
-  // Split entry
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">';
-  html+='<div class="form-group"><label class="form-label">Live / Returned</label><input type="number" class="form-input" id="opsLiveCount" placeholder="0" min="0" max="'+totalOut+'" value="0" oninput="opsUpdatePopped('+totalOut+')"></div>';
-  html+='<div class="form-group"><label class="form-label">Popped</label><input type="number" class="form-input" id="opsPoppedCount" value="'+totalOut+'" readonly style="background:var(--bg-card);"></div>';
-  html+='</div>';
+  if(multiSystem){
+    // Per-system live/popped entry
+    html+='<div style="font-size:12px;font-weight:600;margin-bottom:8px;">Return counts by system:</div>';
+    systemTypes.forEach(function(sys){
+      var count=bySystem[sys];
+      html+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;">';
+      html+='<span style="font-weight:600;width:80px;">'+sys+'</span>';
+      html+='<span style="font-size:11px;color:var(--text-muted);width:40px;">'+count+' out</span>';
+      html+='<label style="font-size:11px;color:var(--text-muted);">Live:</label>';
+      html+='<input type="number" class="form-input" id="opsLive_'+sys.replace(/[^a-zA-Z0-9]/g,'_')+'" min="0" max="'+count+'" value="0" style="width:60px;text-align:center;padding:4px;" oninput="opsUpdateSystemPopped(\''+sys.replace(/'/g,"\\'")+'\','+count+')">';
+      html+='<label style="font-size:11px;color:var(--text-muted);">Popped:</label>';
+      html+='<input type="number" class="form-input" id="opsPopped_'+sys.replace(/[^a-zA-Z0-9]/g,'_')+'" value="'+count+'" readonly style="width:60px;text-align:center;padding:4px;background:var(--bg-card);">';
+      html+='</div>';
+    });
+    // Hidden total fields for compatibility
+    html+='<input type="hidden" id="opsLiveCount" value="0">';
+    html+='<input type="hidden" id="opsPoppedCount" value="'+totalOut+'">';
+  } else {
+    // Single system - simple split
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">';
+    html+='<div class="form-group"><label class="form-label">Live / Returned</label><input type="number" class="form-input" id="opsLiveCount" placeholder="0" min="0" max="'+totalOut+'" value="0" oninput="opsUpdatePopped('+totalOut+')"></div>';
+    html+='<div class="form-group"><label class="form-label">Popped</label><input type="number" class="form-input" id="opsPoppedCount" value="'+totalOut+'" readonly style="background:var(--bg-card);"></div>';
+    html+='</div>';
+  }
   
-  // Scan area for live returns
-  html+='<div style="font-size:12px;font-weight:600;margin-bottom:6px;">Scan live chutes returning</div>';
+  // Scan area
+  html+='<div style="font-size:12px;font-weight:600;margin-bottom:6px;">Scan live chutes returning (optional)</div>';
   html+='<div style="display:flex;gap:8px;margin-bottom:8px;">';
   html+='<input type="text" class="form-input" id="opsSignInScan" placeholder="Scan serial number..." style="flex:1;font-size:14px;padding:10px;" onkeydown="if(event.key===\'Enter\')opsScanSignIn('+signOutIdx+')">';
   html+='<button class="btn btn-primary" onclick="opsScanSignIn('+signOutIdx+')">Scan In</button>';
   html+='</div>';
   html+='<div id="opsSignInLogArea"></div>';
   
+  // Store system info for processing
+  html+='<input type="hidden" id="opsSignInSystems" value=\''+JSON.stringify(bySystem)+'\'>';
+  html+='<input type="hidden" id="opsSignInMulti" value="'+(multiSystem?'1':'0')+'">';
+  
   html+='<div style="display:flex;gap:8px;margin-top:16px;">';
-  html+='<button class="btn btn-primary" onclick="opsProcessSignIn('+signOutIdx+')">Confirm Sign In</button>';
+  html+='<button class="btn btn-primary" onclick="opsProcessSignIn('+signOutIdx+')">Confirm Return</button>';
   html+='<button class="btn btn-secondary" onclick="clearSignInState()">Back</button>';
   html+='</div></div>';
   el.innerHTML=html;
   setTimeout(function(){var inp=document.getElementById('opsSignInScan');if(inp)inp.focus();},100);
+}
+
+function opsUpdateSystemPopped(sys,total){
+  var safeId=sys.replace(/[^a-zA-Z0-9]/g,'_');
+  var liveEl=document.getElementById('opsLive_'+safeId);
+  var poppedEl=document.getElementById('opsPopped_'+safeId);
+  var live=parseInt(liveEl.value)||0;
+  if(live>total) live=total;
+  liveEl.value=live;
+  poppedEl.value=total-live;
+  // Update hidden totals
+  opsRecalcTotals();
+}
+
+function opsRecalcTotals(){
+  var sysData=JSON.parse(document.getElementById('opsSignInSystems').value||'{}');
+  var totalLive=0,totalPopped=0;
+  Object.keys(sysData).forEach(function(sys){
+    var safeId=sys.replace(/[^a-zA-Z0-9]/g,'_');
+    var liveEl=document.getElementById('opsLive_'+safeId);
+    var poppedEl=document.getElementById('opsPopped_'+safeId);
+    if(liveEl) totalLive+=parseInt(liveEl.value)||0;
+    if(poppedEl) totalPopped+=parseInt(poppedEl.value)||0;
+  });
+  document.getElementById('opsLiveCount').value=totalLive;
+  document.getElementById('opsPoppedCount').value=totalPopped;
 }
 
 function opsUpdatePopped(total){
@@ -6255,13 +6313,37 @@ function opsQuickSignIn(signOutIdx,mode){
   var so=S.signedOut[signOutIdx];
   if(!so) return;
   var total=(so.scannedOut||[]).length;
+  var isMulti=document.getElementById('opsSignInMulti')&&document.getElementById('opsSignInMulti').value==='1';
+  
   if(mode==='all_live'){
     document.getElementById('opsLiveCount').value=total;
     document.getElementById('opsPoppedCount').value=0;
+    if(isMulti){
+      var sysData=JSON.parse(document.getElementById('opsSignInSystems').value||'{}');
+      Object.keys(sysData).forEach(function(sys){
+        var safeId=sys.replace(/[^a-zA-Z0-9]/g,'_');
+        var el=document.getElementById('opsLive_'+safeId);
+        var pel=document.getElementById('opsPopped_'+safeId);
+        if(el) el.value=sysData[sys];
+        if(pel) pel.value=0;
+      });
+    }
+    S._quickAllLive=true;
     toast('All '+total+' marked as returned live','success');
   } else {
     document.getElementById('opsLiveCount').value=0;
     document.getElementById('opsPoppedCount').value=total;
+    if(isMulti){
+      var sysData=JSON.parse(document.getElementById('opsSignInSystems').value||'{}');
+      Object.keys(sysData).forEach(function(sys){
+        var safeId=sys.replace(/[^a-zA-Z0-9]/g,'_');
+        var el=document.getElementById('opsLive_'+safeId);
+        var pel=document.getElementById('opsPopped_'+safeId);
+        if(el) el.value=0;
+        if(pel) pel.value=sysData[sys];
+      });
+    }
+    S._quickAllLive=false;
     toast('All '+total+' marked as popped','success');
   }
 }
@@ -6271,34 +6353,65 @@ function opsProcessSignIn(signOutIdx){
   if(!so) return;
   var totalOut=(so.scannedOut||[]).length;
   var live=parseInt(document.getElementById('opsLiveCount').value)||0;
-  var popped=totalOut-live;
+  var popped=parseInt(document.getElementById('opsPoppedCount').value)||0;
   var scannedIn=(S._opsSignInLog||[]).length;
+  var isMulti=document.getElementById('opsSignInMulti')&&document.getElementById('opsSignInMulti').value==='1';
   
-  // Validate
+  // Validate scanned vs declared
   if(live>0&&scannedIn>0&&scannedIn<live){
     toast('Scanned '+scannedIn+' but marked '+live+' live. Scan all or adjust count.','error');return;
+  }
+  
+  // Get per-system breakdown
+  var liveBySys={};
+  var poppedBySys={};
+  
+  if(isMulti){
+    var sysData=JSON.parse(document.getElementById('opsSignInSystems').value||'{}');
+    Object.keys(sysData).forEach(function(sys){
+      var safeId=sys.replace(/[^a-zA-Z0-9]/g,'_');
+      var liveEl=document.getElementById('opsLive_'+safeId);
+      var poppedEl=document.getElementById('opsPopped_'+safeId);
+      var sysLive=liveEl?parseInt(liveEl.value)||0:0;
+      var sysPopped=poppedEl?parseInt(poppedEl.value)||0:0;
+      if(sysLive>0) liveBySys[sys]=sysLive;
+      if(sysPopped>0) poppedBySys[sys]=sysPopped;
+    });
   }
   
   // Return live chutes to their original sections
   var scannedInSNs=(S._opsSignInLog||[]).map(function(e){return e.sn;});
   var allScannedOut=so.scannedOut||[];
   
-  // Determine which chutes are live returns
   var liveChutes=[];
   if(scannedIn>0){
-    // Individually scanned - those specific chutes come back
+    // Individually scanned
     liveChutes=allScannedOut.filter(function(s){return scannedInSNs.indexOf(s.sn)>=0;});
   } else if(live>0){
-    // Not individually scanned - auto-select newest expiration first
-    var sorted=allScannedOut.slice().sort(function(a,b){
-      var expA=(a.rowData&&a.rowData.expirationDate)||'';
-      var expB=(b.rowData&&b.rowData.expirationDate)||'';
-      return expB.localeCompare(expA);
-    });
-    liveChutes=sorted.slice(0,live);
+    if(isMulti){
+      // Per-system selection: pick newest expiration per system
+      Object.keys(liveBySys).forEach(function(sys){
+        var sysChutes=allScannedOut.filter(function(s){return s.system===sys;});
+        sysChutes.sort(function(a,b){
+          var expA=(a.rowData&&a.rowData.expirationDate)||'';
+          var expB=(b.rowData&&b.rowData.expirationDate)||'';
+          return expB.localeCompare(expA);
+        });
+        liveChutes=liveChutes.concat(sysChutes.slice(0,liveBySys[sys]));
+      });
+    } else {
+      // Single system: newest expiration first
+      var sorted=allScannedOut.slice().sort(function(a,b){
+        var expA=(a.rowData&&a.rowData.expirationDate)||'';
+        var expB=(b.rowData&&b.rowData.expirationDate)||'';
+        return expB.localeCompare(expA);
+      });
+      liveChutes=sorted.slice(0,live);
+    }
   }
   
-  // Put live chutes back into their original sections
+  // Put live chutes back
+  var liveSNs=liveChutes.map(function(ch){return ch.sn;});
   liveChutes.forEach(function(chute){
     if(!chute.rowData) return;
     var sec=S.sections.find(function(s){return s.id===chute.secId;});
@@ -6310,37 +6423,28 @@ function opsProcessSignIn(signOutIdx){
     }
   });
   
-  // Popped chutes do NOT go back - they're gone
-  
-  // Add to popped tracker
+  // Add popped to tracker - use per-system counts if available
   if(popped>0){
-    // Figure out which chutes are popped (the ones NOT scanned in)
-    var scannedInSNs=(S._opsSignInLog||[]).map(function(e){return e.sn;});
-    var poppedSNs=(so.scannedOut||[]).filter(function(s){return scannedInSNs.indexOf(s.sn)<0;}).slice(0,popped);
-    
-    // Count popped per system
-    var poppedBySys={};
-    poppedSNs.forEach(function(p){
-      if(!poppedBySys[p.system]) poppedBySys[p.system]=0;
-      poppedBySys[p.system]++;
-    });
-    
-    // If no individual tracking, distribute evenly
-    if(Object.keys(poppedBySys).length===0){
-      var items=so.items||[{system:'T-11',count:String(totalOut)}];
-      var remaining=popped;
-      items.forEach(function(it){
-        var forSys=Math.min(remaining,parseInt(it.count)||0);
-        if(forSys>0) poppedBySys[it.system]=forSys;
-        remaining-=forSys;
+    if(isMulti&&Object.keys(poppedBySys).length>0){
+      Object.keys(poppedBySys).forEach(function(sys){
+        if(!S.statusCounts[sys]) S.statusCounts[sys]={};
+        if(!S.statusCounts[sys].popped) S.statusCounts[sys].popped=[];
+        S.statusCounts[sys].popped.push({bin:so.unit+' '+so.date,count:poppedBySys[sys]});
+      });
+    } else {
+      // Figure out from remaining chutes
+      var poppedChutes=allScannedOut.filter(function(s){return liveSNs.indexOf(s.sn)<0;}).slice(0,popped);
+      var autoPoppedBySys={};
+      poppedChutes.forEach(function(p){
+        if(!autoPoppedBySys[p.system]) autoPoppedBySys[p.system]=0;
+        autoPoppedBySys[p.system]++;
+      });
+      Object.keys(autoPoppedBySys).forEach(function(sys){
+        if(!S.statusCounts[sys]) S.statusCounts[sys]={};
+        if(!S.statusCounts[sys].popped) S.statusCounts[sys].popped=[];
+        S.statusCounts[sys].popped.push({bin:so.unit+' '+so.date,count:autoPoppedBySys[sys]});
       });
     }
-    
-    Object.keys(poppedBySys).forEach(function(sys){
-      if(!S.statusCounts[sys]) S.statusCounts[sys]={};
-      if(!S.statusCounts[sys].popped) S.statusCounts[sys].popped=[];
-      S.statusCounts[sys].popped.push({bin:so.unit+' '+so.date,count:poppedBySys[sys]});
-    });
   }
   
   so.status='returned';
@@ -6353,7 +6457,7 @@ function opsProcessSignIn(signOutIdx){
   auditLog('signout','Sign In','Returned '+so.unit+': '+live+' live, '+popped+' popped');
   S._opsSignInLog=[];
   save();
-  toast('Sign in complete: '+live+' live, '+popped+' popped','success',8000);
+  toast('Return complete: '+live+' live, '+popped+' popped','success',8000);
   renderSections();
   renderOps();
 }
