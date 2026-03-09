@@ -585,6 +585,7 @@
       <button class="btn btn-secondary" style="font-size:10px;padding:3px 8px;margin-top:6px;" onclick="document.getElementById('dbLog').textContent=''">Clear</button>
       <button class="btn btn-primary" style="font-size:10px;padding:3px 8px;margin-top:6px;margin-left:6px;" onclick="pushLocalToDB()">Push Local Data to Database</button>
       <button class="btn btn-primary" style="font-size:10px;padding:3px 8px;margin-top:6px;margin-left:6px;" onclick="syncFromDB()">Sync From Database</button>
+      <button class="btn btn-danger" style="font-size:10px;padding:3px 8px;margin-top:6px;margin-left:6px;" onclick="clearAllLocalData()">Clear All Local Data</button>
       <button class="btn btn-secondary" style="font-size:10px;padding:3px 8px;margin-top:6px;margin-left:6px;" onclick="testDbMethods()">Test Connection</button>
     </div>
     <h3 style="font-size:14px;color:var(--text-secondary);margin-bottom:10px;">Audit Log</h3>
@@ -7256,6 +7257,16 @@ function startAutoSync(){
 }
 function stopAutoSync(){
   if(_autoSyncInterval){clearInterval(_autoSyncInterval);_autoSyncInterval=null;}
+}
+
+function clearAllLocalData(){
+  showConfirm('Clear All Local Data','This will erase ALL local data on this device and reload. Cloud data in Supabase is NOT affected. Continue?',
+    [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
+     {label:'Clear Everything',cls:'btn-danger',fn:function(){
+       localStorage.clear();
+       sessionStorage.clear();
+       location.reload();
+     }}]);
 }
 
 if('serviceWorker' in navigator){
