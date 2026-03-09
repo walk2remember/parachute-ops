@@ -2500,7 +2500,7 @@ function sectionHTML(sec){
           <button class="btn btn-secondary btn-sm" onclick="bulkFill(${sec.id})">📋 Bulk Fill Selected</button>
           <button class="btn btn-secondary btn-sm" onclick="printPackLog(${sec.id})">🖨 Pack Log</button>
           <button class="btn btn-secondary btn-sm" onclick="printFISheet(${sec.id})">🖨 FI Sheet</button>
-          <button class="btn btn-secondary btn-sm" onclick="saveToArchive(${sec.id})">💾 Save to Archive</button>
+
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);margin-bottom:6px;">
@@ -3020,42 +3020,41 @@ function toggleArchiveMonth(label){
 }
 
 
-function saveToArchive(secId){
-  var sec=S.sections.find(function(s){return s.id===secId;});
-  if(!sec) return;
-  
-  var now=new Date();
-  var label=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
-  
+
+function savePreviewToArchive(){
+  if(!_previewArchiveData){toast('No archive data','warning');return;}
+  var ad=_previewArchiveData;
   if(!S.monthlySnapshots) S.monthlySnapshots=[];
   
-  // Find or create snapshot for this month
+  var label=ad.label;
   var snapshot=S.monthlySnapshots.find(function(s){return s.label===label;});
+  
   if(!snapshot){
+    // Create new snapshot
     createSnapshot(label);
-    save();
-    renderArchive();
-    toast('Saved to archive: '+label,'success');
-  } else {
-    // Update the existing snapshot with current section data
-    var existingSec=snapshot.sections.find(function(s){return s.binLocation===sec.binLocation&&s.systemType===sec.systemType;});
-    var newSecData={
-      binLocation:sec.binLocation, systemType:sec.systemType, maxChutes:sec.maxChutes,
-      rowCount:sec.rows.length,
-      rows:sec.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})
-    };
-    if(existingSec){
-      // Replace
-      var idx=snapshot.sections.indexOf(existingSec);
-      snapshot.sections[idx]=newSecData;
+    snapshot=S.monthlySnapshots.find(function(s){return s.label===label;});
+  }
+  
+  if(snapshot && ad.sectionData){
+    // Update or add section data
+    var existing=snapshot.sections.find(function(s){
+      return s.binLocation===ad.sectionData.binLocation && s.systemType===ad.sectionData.systemType;
+    });
+    if(existing){
+      var idx=snapshot.sections.indexOf(existing);
+      snapshot.sections[idx]=ad.sectionData;
     } else {
-      snapshot.sections.push(newSecData);
+      snapshot.sections.push(ad.sectionData);
     }
     snapshot.date=new Date().toISOString();
-    save();
-    renderArchive();
-    toast('Updated archive for '+sec.binLocation+' in '+label,'success');
   }
+  
+  save();
+  toast('Saved to archive: '+label,'success');
+  
+  // Hide the button after saving
+  var btn=document.getElementById('saveArchiveBtn');
+  if(btn) btn.style.display='none';
 }
 
 function createManualSnapshot(label){
@@ -3221,7 +3220,8 @@ function printPackLog(secId){
   });
   var packerNames=Object.keys(packerGroups);
   if(packerNames.length<=1 && unassigned.length===0){
-    openPrintPreview('Pack Log \u2014 '+s.binLocation, buildPackLogBody(s, s.rows, packerNames[0]||'', now));
+    var _archData={label:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),sectionData:{binLocation:s.binLocation,systemType:s.systemType,maxChutes:s.maxChutes,rowCount:s.rows.length,rows:s.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})}};
+    openPrintPreview('Pack Log \u2014 '+s.binLocation, buildPackLogBody(s, s.rows, packerNames[0]||'', now), _archData);
     return;
   }
   var allBodies='';
@@ -3233,7 +3233,8 @@ function printPackLog(secId){
     if(packerNames.length>0) allBodies+='<div style="page-break-before:always;"></div>';
     allBodies+=buildPackLogBody(s, unassigned, '', now);
   }
-  openPrintPreview('Pack Logs \u2014 '+s.binLocation+' ('+packerNames.length+' packer'+(packerNames.length!==1?'s':'')+')', allBodies);
+  var _archData2={label:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),sectionData:{binLocation:s.binLocation,systemType:s.systemType,maxChutes:s.maxChutes,rowCount:s.rows.length,rows:s.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})}};
+  openPrintPreview('Pack Logs \u2014 '+s.binLocation+' ('+packerNames.length+' packer'+(packerNames.length!==1?'s':'')+')', allBodies, _archData2);
 }
 
 function buildPackLogBody(s, rows, packerName, now){
@@ -3346,10 +3347,12 @@ function generateFISheet(secId){
   }
 
   body+=`<div class="footer">Parachute Management System — FI Sheet Generated ${now}</div>`;
-  openPrintPreview(`FI Sheet — ${s.binLocation}`, body);
+  openPrintPreview(`FI Sheet — ${s.binLocation}`, body, {label:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),sectionData:{binLocation:s.binLocation,systemType:s.systemType,maxChutes:s.maxChutes,rowCount:s.rows.length,rows:s.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})}});
 }
 
-function openPrintPreview(title, bodyContent){
+var _previewArchiveData=null;
+function openPrintPreview(title, bodyContent, archiveData){
+  _previewArchiveData=archiveData||null;
   let existing=document.getElementById('printPreviewOverlay');
   if(existing) existing.remove();
 
@@ -3383,6 +3386,7 @@ function openPrintPreview(title, bodyContent){
       <span class="print-toolbar-title">${title}</span>
       <div class="print-toolbar-actions">
         <button class="btn btn-primary btn-sm" onclick="doPrint()">🖨 Print</button>
+        <button class="btn btn-secondary btn-sm" id="saveArchiveBtn" onclick="savePreviewToArchive()" style="display:none;">💾 Save to Archive</button>
         <button class="btn btn-secondary btn-sm" onclick="closePrintPreview()">✕ Close</button>
       </div>
     </div>
@@ -3394,6 +3398,11 @@ function openPrintPreview(title, bodyContent){
   `;
   document.body.appendChild(overlay);
 
+  // Show Save to Archive button if archive data provided
+  if(_previewArchiveData){
+    var btn=document.getElementById('saveArchiveBtn');
+    if(btn) btn.style.display='';
+  }
   // Auto-resize iframe to content
   setTimeout(()=>{
     const fr=document.getElementById('printFrame');
