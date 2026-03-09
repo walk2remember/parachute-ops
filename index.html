@@ -2966,35 +2966,68 @@ function savePreviewToArchive(){
   if(!_previewArchiveData){toast('No archive data','warning');return;}
   var ad=_previewArchiveData;
   if(!S.monthlySnapshots) S.monthlySnapshots=[];
+  if(!ad.sectionData||!ad.sectionData.rows){toast('No data to save','warning');return;}
   
-  var label=ad.label;
-  var snapshot=S.monthlySnapshots.find(function(s){return s.label===label;});
+  var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   
-  if(!snapshot){
-    // Create new snapshot
-    createSnapshot(label);
-    snapshot=S.monthlySnapshots.find(function(s){return s.label===label;});
-  }
+  // Split rows by pack date month
+  var byMonth={};
+  ad.sectionData.rows.forEach(function(r){
+    var label='No Date';
+    if(r.packDate){
+      var pd=new Date(r.packDate+'T00:00:00');
+      label=months[pd.getMonth()]+' '+pd.getFullYear();
+    }
+    if(!byMonth[label]) byMonth[label]=[];
+    byMonth[label].push(r);
+  });
   
-  if(snapshot && ad.sectionData){
-    // Update or add section data
+  var savedMonths=[];
+  Object.keys(byMonth).forEach(function(label){
+    if(label==='No Date') return;
+    var rows=byMonth[label];
+    
+    var snapshot=S.monthlySnapshots.find(function(s){return s.label===label;});
+    if(!snapshot){
+      snapshot={label:label,date:new Date().toISOString(),sections:[],totalChutes:0,totalPopped:0,totalMaint:0,totalSignedOut:0,sectionCount:0,statusCounts:{},signedOut:[]};
+      S.monthlySnapshots.push(snapshot);
+    }
+    
+    // Find or create section entry for this month
+    var secData={
+      binLocation:ad.sectionData.binLocation,
+      systemType:ad.sectionData.systemType,
+      maxChutes:ad.sectionData.maxChutes,
+      rowCount:rows.length,
+      rows:rows
+    };
+    
     var existing=snapshot.sections.find(function(s){
-      return s.binLocation===ad.sectionData.binLocation && s.systemType===ad.sectionData.systemType;
+      return s.binLocation===secData.binLocation && s.systemType===secData.systemType;
     });
     if(existing){
-      var idx=snapshot.sections.indexOf(existing);
-      snapshot.sections[idx]=ad.sectionData;
+      // Merge rows - add new ones, update existing by serial number
+      rows.forEach(function(newRow){
+        var existRow=existing.rows.find(function(r){return r.serialNumber===newRow.serialNumber;});
+        if(existRow){
+          Object.assign(existRow,newRow);
+        } else {
+          existing.rows.push(newRow);
+        }
+      });
+      existing.rowCount=existing.rows.length;
     } else {
-      snapshot.sections.push(ad.sectionData);
+      snapshot.sections.push(secData);
     }
     snapshot.date=new Date().toISOString();
-  }
+    snapshot.sectionCount=snapshot.sections.length;
+    savedMonths.push(label+' ('+rows.length+')');
+  });
   
   save();
   renderArchive();
-  toast('Saved to archive: '+label+'. Check the Archive tab.','success',5000);
+  toast('Saved to: '+savedMonths.join(', ')+'. Check Archive tab.','success',5000);
   
-  // Hide the button after saving
   var btn=document.getElementById('saveArchiveBtn');
   if(btn) btn.style.display='none';
 }
@@ -3075,9 +3108,7 @@ function printArchiveFIBySection(monthLabel,binLocation,systemType){
     var rows=byDate[date];
     var dateDisplay=date==='No Date'?'No Date':new Date(date+'T00:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
     
-    // Get unique IPs for this date
-    var ips={};rows.forEach(function(r){if(r.ip)ips[r.ip]=true;});
-    var ipList=Object.keys(ips).join(', ')||'N/A';
+    // Signature block
     
     body+='<h1>Final Inspector (FI) Sheet \u2014 Archive</h1>';
     body+='<div class="header-info">';
@@ -3093,7 +3124,7 @@ function printArchiveFIBySection(monthLabel,binLocation,systemType){
     });
     body+='</tbody></table>';
     
-    body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Inspector (FI): '+esc(ipList)+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
+    body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Final Inspector (FI)</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
   });
   
   body+='<div class="footer">Parachute Management System \u2014 Archive FI Sheet \u2014 '+monthLabel+'</div>';
@@ -3148,7 +3179,7 @@ function printArchiveFI(monthLabel,packerName){
   body+='</tbody></table>';
   var ips={};allRows.forEach(function(item){if(item.r.ip)ips[item.r.ip]=true;});
   var ipList=Object.keys(ips).join(', ')||'N/A';
-  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Inspector (FI): '+esc(ipList)+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
+  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Final Inspector (FI)</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
   body+='<div class="footer">Parachute Management System — Archive FI Sheet — '+monthLabel+'</div>';
   openPrintPreview('FI Sheet — '+esc(packerName)+' — '+monthLabel, body);
 }
