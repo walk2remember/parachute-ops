@@ -1807,6 +1807,7 @@ function doCreateAccount(){
 }
 
 function doLogout(){
+  stopAutoSync();
   if(currentUser) auditLog('config','Logout','User logged out: '+(currentUser.lastName||currentUser.name));
   currentUser=null;
   sessionStorage.removeItem('pms_session');
@@ -7216,6 +7217,18 @@ load(); autoMonthlySnapshot(); updateDL(); updateBinDL(); renderStatusBar(); ren
       dbLog('Supabase fully connected');
       var si=document.getElementById('dbStatus');
       if(si){si.textContent='\u{1F7E2}';si.title='Connected to database';}
+      // Sync units and data from cloud
+      await syncUnits();
+      await resolveUnitId();
+      if(activeUnitId){
+        var loaded=await loadFromDB();
+        if(loaded){
+          try{localStorage.setItem(getStorageKey(),JSON.stringify(S));}catch(e){}
+          renderAll();
+          dbLog('Cloud data loaded');
+        }
+      }
+      startAutoSync();
     }
   } catch(e){
     console.error('Supabase init error:', e);
@@ -7225,6 +7238,26 @@ load(); autoMonthlySnapshot(); updateDL(); updateBinDL(); renderStatusBar(); ren
   }
 })();
 // ══ PWA SERVICE WORKER ══
+// Auto-sync from cloud every 30 seconds
+var _autoSyncInterval=null;
+function startAutoSync(){
+  if(_autoSyncInterval) return;
+  _autoSyncInterval=setInterval(async function(){
+    if(!sbClient||!activeUnitId||!currentUser) return;
+    if(_savingToDB) return; // Don't pull while pushing
+    try{
+      var success=await loadFromDB();
+      if(success){
+        try{localStorage.setItem(getStorageKey(),JSON.stringify(S));}catch(e){}
+        renderAll();
+      }
+    }catch(e){}
+  },30000);
+}
+function stopAutoSync(){
+  if(_autoSyncInterval){clearInterval(_autoSyncInterval);_autoSyncInterval=null;}
+}
+
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').then(function(reg){
     console.log('SW registered');
