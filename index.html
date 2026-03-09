@@ -1226,12 +1226,12 @@ async function saveUnitDB(unit) {
   if (!sbClient) return;
   await dbCall(async () => {
     var dbRow = {
-      name: unit.unitName || unit.id,
+      name: unit.name || unit.unitName || unit.id,
       designation: unit.designation || '',
       config: {
-        systems: unit.systems || [],
-        statusCats: unit.statusCats || [],
-        facilityTypes: unit.facilityTypes || []
+        systems: unit.systems || (unit.config&&unit.config.systems) || [],
+        statusCats: unit.statusCats || (unit.config&&unit.config.statusCats) || [],
+        facilityTypes: unit.facilityTypes || (unit.config&&unit.config.facilityTypes) || []
       }
     };
     if (unit._dbId) {
@@ -1241,6 +1241,10 @@ async function saveUnitDB(unit) {
       if (data && data[0]) {
         unit._dbId = data[0].id;
         activeUnitId = data[0].id;
+        // Save _dbId back to local units
+        var units=getUnits();
+        var local=units.find(function(u){return u.id===unit.id;});
+        if(local){local._dbId=data[0].id;saveUnits(units);}
       }
     }
   });
@@ -4001,7 +4005,7 @@ function wizFinish(){
   if(sbClient){
     (async function(){
       var units=getUnits();
-      var u=units.find(function(x){return x.unitName===d.unitName||x.id===d.unitName;});
+      var u=units.find(function(x){return x.id===id;});
       if(u) await saveUnitDB(u);
       await resolveUnitId();
     })();
