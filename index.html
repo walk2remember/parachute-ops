@@ -2966,59 +2966,44 @@ function savePreviewToArchive(){
   if(!_previewArchiveData){toast('No archive data','warning');return;}
   var ad=_previewArchiveData;
   if(!S.monthlySnapshots) S.monthlySnapshots=[];
-  if(!ad.sectionData||!ad.sectionData.rows){toast('No data to save','warning');return;}
+  if(!ad.sectionData||!ad.sectionData.rows||ad.sectionData.rows.length===0){toast('No data to save','warning');return;}
   
   var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   
   // Split rows by pack date month
   var byMonth={};
   ad.sectionData.rows.forEach(function(r){
-    var label='No Date';
-    if(r.packDate){
-      var pd=new Date(r.packDate+'T00:00:00');
-      label=months[pd.getMonth()]+' '+pd.getFullYear();
-    }
+    if(!r.packDate) return;
+    var pd=new Date(r.packDate+'T00:00:00');
+    var label=months[pd.getMonth()]+' '+pd.getFullYear();
     if(!byMonth[label]) byMonth[label]=[];
-    byMonth[label].push(r);
+    byMonth[label].push(JSON.parse(JSON.stringify(r)));
   });
   
   var savedMonths=[];
   Object.keys(byMonth).forEach(function(label){
-    if(label==='No Date') return;
     var rows=byMonth[label];
     
+    // Find or create snapshot for this month
     var snapshot=S.monthlySnapshots.find(function(s){return s.label===label;});
     if(!snapshot){
-      snapshot={label:label,date:new Date().toISOString(),sections:[],totalChutes:0,totalPopped:0,totalMaint:0,totalSignedOut:0,sectionCount:0,statusCounts:{},signedOut:[]};
+      snapshot={label:label,date:new Date().toISOString(),sections:[],sectionCount:0};
       S.monthlySnapshots.push(snapshot);
     }
     
-    // Find or create section entry for this month
-    var secData={
-      binLocation:ad.sectionData.binLocation,
-      systemType:ad.sectionData.systemType,
-      maxChutes:ad.sectionData.maxChutes,
-      rowCount:rows.length,
-      rows:rows
-    };
-    
-    var existing=snapshot.sections.find(function(s){
-      return s.binLocation===secData.binLocation && s.systemType===secData.systemType;
+    // Find or create section in this snapshot
+    var secEntry=snapshot.sections.find(function(s){
+      return s.binLocation===ad.sectionData.binLocation && s.systemType===ad.sectionData.systemType;
     });
-    if(existing){
-      // Merge rows - add new ones, update existing by serial number
-      rows.forEach(function(newRow){
-        var existRow=existing.rows.find(function(r){return r.serialNumber===newRow.serialNumber;});
-        if(existRow){
-          Object.assign(existRow,newRow);
-        } else {
-          existing.rows.push(newRow);
-        }
-      });
-      existing.rowCount=existing.rows.length;
-    } else {
-      snapshot.sections.push(secData);
+    
+    if(!secEntry){
+      secEntry={binLocation:ad.sectionData.binLocation,systemType:ad.sectionData.systemType,maxChutes:ad.sectionData.maxChutes,rowCount:0,rows:[]};
+      snapshot.sections.push(secEntry);
     }
+    
+    // Replace rows for this month (not merge/double)
+    secEntry.rows=rows;
+    secEntry.rowCount=rows.length;
     snapshot.date=new Date().toISOString();
     snapshot.sectionCount=snapshot.sections.length;
     savedMonths.push(label+' ('+rows.length+')');
@@ -3026,11 +3011,12 @@ function savePreviewToArchive(){
   
   save();
   renderArchive();
-  toast('Saved to: '+savedMonths.join(', ')+'. Check Archive tab.','success',5000);
+  toast('Saved to: '+savedMonths.join(', '),'success',5000);
   
   var btn=document.getElementById('saveArchiveBtn');
   if(btn) btn.style.display='none';
 }
+
 
 function createManualSnapshot(label){
   if(!S.monthlySnapshots) S.monthlySnapshots=[];
@@ -3241,37 +3227,42 @@ function fmtPrintDate(d){
 function printPackLog(secId){
   var s=S.sections.find(function(x){return x.id===secId}); if(!s)return;
   var now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-  var packerGroups={};
-  var unassigned=[];
+  
+  // Group rows by packer + date combo
+  var groups={};
   s.rows.forEach(function(r){
-    var pk=(r.packer||'').trim();
-    if(!pk){ unassigned.push(r); return; }
-    if(!packerGroups[pk]) packerGroups[pk]=[];
-    packerGroups[pk].push(r);
+    var pk=(r.packer||'').trim()||'Unassigned';
+    var pd=r.packDate||'No Date';
+    var key=pk+'||'+pd;
+    if(!groups[key]) groups[key]={packer:pk,date:pd,rows:[]};
+    groups[key].rows.push(r);
   });
-  var packerNames=Object.keys(packerGroups);
-  if(packerNames.length<=1 && unassigned.length===0){
-    var _archData={label:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),sectionData:{binLocation:s.binLocation,systemType:s.systemType,maxChutes:s.maxChutes,rowCount:s.rows.length,rows:s.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})}};
-    openPrintPreview('Pack Log \u2014 '+s.binLocation, buildPackLogBody(s, s.rows, packerNames[0]||'', now), _archData);
-    return;
-  }
+  
+  var keys=Object.keys(groups).sort(function(a,b){
+    var ga=groups[a],gb=groups[b];
+    if(ga.date!==gb.date) return ga.date.localeCompare(gb.date);
+    return ga.packer.localeCompare(gb.packer);
+  });
+  
   var allBodies='';
-  packerNames.forEach(function(pk,pi){
-    if(pi>0) allBodies+='<div style="page-break-before:always;"></div>';
-    allBodies+=buildPackLogBody(s, packerGroups[pk], pk, now);
+  keys.forEach(function(key,ki){
+    if(ki>0) allBodies+='<div style="page-break-before:always;"></div>';
+    allBodies+=buildPackLogBody(s, groups[key].rows, groups[key].packer, groups[key].date, now);
   });
-  if(unassigned.length>0){
-    if(packerNames.length>0) allBodies+='<div style="page-break-before:always;"></div>';
-    allBodies+=buildPackLogBody(s, unassigned, '', now);
-  }
-  var _archData2={label:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),sectionData:{binLocation:s.binLocation,systemType:s.systemType,maxChutes:s.maxChutes,rowCount:s.rows.length,rows:s.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})}};
-  openPrintPreview('Pack Logs \u2014 '+s.binLocation+' ('+packerNames.length+' packer'+(packerNames.length!==1?'s':'')+')', allBodies, _archData2);
+  
+  var _archData={sectionData:{binLocation:s.binLocation,systemType:s.systemType,maxChutes:s.maxChutes,rowCount:s.rows.length,rows:s.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})}};
+  var title=keys.length===1?'Pack Log \u2014 '+s.binLocation:'Pack Logs \u2014 '+s.binLocation+' ('+keys.length+' sheets)';
+  openPrintPreview(title, allBodies, _archData);
 }
 
-function buildPackLogBody(s, rows, packerName, now){
+
+function buildPackLogBody(s, rows, packerName, packDate, now){
+  var dateDisplay=packDate==='No Date'?'':new Date(packDate+'T00:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   var earliest=rows.find(function(r){return r.expirationDate;});
-  var body='<h1>Personal Pack Log'+(packerName?' \u2014 '+packerName.toUpperCase():'')+'</h1>';
-  body+='<div class="header-info"><strong>Bin:</strong> '+s.binLocation+' &nbsp;|&nbsp; <strong>System:</strong> '+s.systemType+' &nbsp;|&nbsp; <strong>Chutes:</strong> '+rows.length+' &nbsp;|&nbsp; <strong>Printed:</strong> '+now;
+  var body='<h1>Personal Pack Log'+(packerName&&packerName!=='Unassigned'?' \u2014 '+packerName.toUpperCase():'')+'</h1>';
+  body+='<div class="header-info"><strong>Bin:</strong> '+s.binLocation+' &nbsp;|&nbsp; <strong>System:</strong> '+s.systemType+' &nbsp;|&nbsp; <strong>Chutes:</strong> '+rows.length;
+  if(dateDisplay) body+=' &nbsp;|&nbsp; <strong>Pack Date:</strong> '+dateDisplay;
+  body+=' &nbsp;|&nbsp; <strong>Printed:</strong> '+now;
   if(earliest && earliest.expirationDate){
     body+=' &nbsp;|&nbsp; <strong>Expiration:</strong> <span class="'+printExpClass(earliest.expirationDate)+'">'+fmtPrintDate(earliest.expirationDate)+'</span>';
   }
@@ -3281,84 +3272,82 @@ function buildPackLogBody(s, rows, packerName, now){
     body+='<tr><td>'+(i+1)+'</td><td>'+(r.serialNumber||'\u2014')+'</td><td>'+(r.dom||'\u2014')+'</td><td>'+(r.pis||'\u2014')+'</td><td>'+(r.osd||'\u2014')+'</td><td>'+(r.dbag||'\u2014')+'</td><td>'+(r.packer||'\u2014')+'</td><td>'+(r.ip||'\u2014')+'</td><td>'+fmtPrintDate(r.packDate)+'</td></tr>';
   });
   body+='</tbody></table>';
-  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Packer'+(packerName?': '+packerName.toUpperCase():'')+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
+  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Packer'+(packerName&&packerName!=='Unassigned'?': '+packerName.toUpperCase():'')+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
   body+='<div class="footer">Parachute Management System \u2014 Pack Log Generated '+now+'</div>';
   return body;
 }
 
+
 function printFISheet(secId){
   const s=S.sections.find(x=>x.id===secId); if(!s)return;
-
-  // Show FI setup dialog
-  showConfirm('FI Sheet Setup',
-    `<div style="text-align:left;">
-      <div class="form-group">
-        <label class="form-label">How many Final Inspectors?</label>
-        <select class="form-select" id="fiCount" onchange="updateFINameFields()">
-          <option value="1">1 FI</option>
-          <option value="2">2 FIs</option>
-          <option value="3">3 FIs</option>
-        </select>
-      </div>
-      <div id="fiNameFields">
-        <div class="form-group"><label class="form-label">FI #1 Name</label><input type="text" class="form-input fi-name-input" placeholder="Enter name"></div>
-      </div>
-    </div>`,
-    [
-      {label:'Cancel',cls:'btn-secondary',fn:()=>{}},
-      {label:'Generate Sheet',cls:'btn-primary',fn:()=>{ generateFISheet(secId); }},
-    ]
-  );
-}
-
-function updateFINameFields(){
-  const count=parseInt(document.getElementById('fiCount')?.value)||1;
-  const container=document.getElementById('fiNameFields');
-  if(!container) return;
-  let html='';
-  for(let i=1;i<=count;i++){
-    html+=`<div class="form-group"><label class="form-label">FI #${i} Name</label><input type="text" class="form-input fi-name-input" placeholder="Enter name"></div>`;
+  
+  // Get unique pack dates
+  var dates={};
+  s.rows.forEach(function(r){
+    if(r.packDate) dates[r.packDate]=true;
+  });
+  var dateList=Object.keys(dates).sort();
+  
+  if(dateList.length===0){
+    toast('No pack dates found in this section','warning');return;
   }
-  container.innerHTML=html;
+  
+  // Build dialog asking for FI name per date
+  var html='<div style="text-align:left;">';
+  html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Enter the Final Inspector for each pack date:</div>';
+  dateList.forEach(function(date,idx){
+    var dateDisplay=new Date(date+'T00:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+    var chutes=s.rows.filter(function(r){return r.packDate===date;}).length;
+    html+='<div class="form-group" style="margin-bottom:8px;">';
+    html+='<label class="form-label">'+dateDisplay+' ('+chutes+' chutes)</label>';
+    html+='<input type="text" class="form-input fi-date-input" data-date="'+date+'" placeholder="FI name...">';
+    html+='</div>';
+  });
+  html+='</div>';
+  
+  showConfirm('FI Sheet Setup', html,
+    [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
+     {label:'Generate Sheets',cls:'btn-primary',fn:function(){ generateFISheet(secId); }}]
+  );
 }
 
 function generateFISheet(secId){
   const s=S.sections.find(x=>x.id===secId); if(!s)return;
   const now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-
-  // Get FI names
-  const nameInputs=document.querySelectorAll('.fi-name-input');
-  const fiNames=Array.from(nameInputs).map(el=>el.value.trim()).filter(n=>n);
-  const fiCount=fiNames.length||1;
-
-  // Check FI role conflicts
-  if(fiNames.length>0){
-    const conflict=checkFIConflict(secId, fiNames);
-    if(conflict){
-      showConfirm('Role Conflict',
-        '<strong>'+conflict.name+'</strong> is already assigned as a <strong>'+conflict.role+'</strong> in this section. The FI cannot also serve as Packer or IP.',
-        [{label:'OK',cls:'btn-primary',fn:function(){}}]);
-      return;
+  
+  // Get FI names per date from dialog inputs
+  var fiByDate={};
+  var inputs=document.querySelectorAll('.fi-date-input');
+  inputs.forEach(function(inp){
+    var date=inp.dataset.date;
+    var name=inp.value.trim();
+    if(date) fiByDate[date]=name||'';
+  });
+  
+  // Check for role conflicts
+  var dates=Object.keys(fiByDate).sort();
+  for(var di=0;di<dates.length;di++){
+    var fiName=fiByDate[dates[di]];
+    if(!fiName) continue;
+    var dateRows=s.rows.filter(function(r){return r.packDate===dates[di];});
+    for(var ri=0;ri<dateRows.length;ri++){
+      if(dateRows[ri].packer===fiName||dateRows[ri].ip===fiName){
+        var role=dateRows[ri].packer===fiName?'Packer':'IP';
+        showConfirm('Role Conflict',
+          '<strong>'+fiName+'</strong> is already a <strong>'+role+'</strong> on '+dates[di]+'. FI cannot also be '+role+'.',
+          [{label:'OK',cls:'btn-primary',fn:function(){}}]);
+        return;
+      }
     }
   }
-
-  const fiDisplay=fiNames.length>0?fiNames.join(' / '):'';
-  const fiHeader=fiDisplay?'FI: '+fiDisplay:'FI';
-
-  // Group rows by pack date
-  var byDate={};
-  s.rows.forEach(function(r){
-    var pd=r.packDate||'No Date';
-    if(!byDate[pd]) byDate[pd]=[];
-    byDate[pd].push(r);
-  });
-  var dates=Object.keys(byDate).sort();
-
+  
+  // Build FI sheets - one per date
   var body='';
   dates.forEach(function(date,di){
     if(di>0) body+='<div style="page-break-before:always;"></div>';
-    var rows=byDate[date];
-    var dateDisplay=date==='No Date'?'No Date':new Date(date+'T00:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+    var rows=s.rows.filter(function(r){return r.packDate===date;});
+    var fiName=fiByDate[date]||'';
+    var dateDisplay=new Date(date+'T00:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
     
     body+='<h1>Final Inspector (FI) Sheet</h1>';
     body+='<div class="header-info">';
@@ -3367,31 +3356,27 @@ function generateFISheet(secId){
     body+='<strong>Chutes:</strong> '+rows.length+' &nbsp;|&nbsp; ';
     body+='<strong>Printed:</strong> '+now;
     body+='</div>';
-
-    body+='<table><thead><tr>';
-    body+='<th>#</th><th>Serial Number</th><th>DOM</th><th>PIS</th><th>OSD</th><th>D-Bag #</th><th>Packer</th><th>IP</th><th>Pack Date</th><th>'+fiHeader+'</th>';
-    body+='</tr></thead><tbody>';
+    
+    var fiHeader=fiName?'FI: '+fiName.toUpperCase():'FI';
+    body+='<table><thead><tr><th>#</th><th>Serial Number</th><th>DOM</th><th>PIS</th><th>OSD</th><th>D-Bag #</th><th>Packer</th><th>IP</th><th>Pack Date</th><th>'+fiHeader+'</th></tr></thead><tbody>';
     rows.forEach(function(r,ri){
       body+='<tr><td>'+(ri+1)+'</td><td>'+(r.serialNumber||'\u2014')+'</td><td>'+(r.dom||'\u2014')+'</td><td>'+(r.pis||'\u2014')+'</td><td>'+(r.osd||'\u2014')+'</td><td>'+(r.dbag||'\u2014')+'</td><td>'+(r.packer||'\u2014')+'</td><td>'+(r.ip||'\u2014')+'</td><td>'+fmtPrintDate(r.packDate)+'</td><td style="min-width:70px;"><div style="border-bottom:1px solid #999;height:16px;"></div></td></tr>';
     });
     body+='</tbody></table>';
-
-    // Signature blocks for each FI
-    for(var fi=0;fi<fiCount;fi++){
-      var name=(fiNames[fi]||'_____________').toUpperCase();
-      body+='<div class="sig-line" style="margin-top:'+(fi===0?'30':'20')+'px;">';
-      body+='<div class="sig-block"><div class="sig-label">FI #'+(fi+1)+' Name</div><div style="font-size:14px;font-weight:700;text-align:center;">'+name+'</div><div class="sig-field"></div></div>';
-      body+='<div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field" style="margin-top:22px;"></div></div>';
-      body+='<div class="sig-block"><div class="sig-label">Date</div><div class="sig-field" style="margin-top:22px;"></div></div>';
-      body+='</div>';
-    }
+    
+    body+='<div class="sig-line" style="margin-top:30px;">';
+    body+='<div class="sig-block"><div class="sig-label">Final Inspector (FI)'+(fiName?': '+fiName.toUpperCase():'')+'</div><div class="sig-field"></div></div>';
+    body+='<div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field" style="margin-top:22px;"></div></div>';
+    body+='<div class="sig-block"><div class="sig-label">Date</div><div class="sig-field" style="margin-top:22px;"></div></div>';
+    body+='</div>';
   });
-
+  
   body+='<div class="footer">Parachute Management System \u2014 FI Sheet Generated '+now+'</div>';
-
-  var _archData={label:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),sectionData:{binLocation:s.binLocation,systemType:s.systemType,maxChutes:s.maxChutes,rowCount:s.rows.length,rows:s.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})}};
+  
+  var _archData={sectionData:{binLocation:s.binLocation,systemType:s.systemType,maxChutes:s.maxChutes,rowCount:s.rows.length,rows:s.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})}};
   openPrintPreview('FI Sheet \u2014 '+s.binLocation+(dates.length>1?' ('+dates.length+' days)':''), body, _archData);
 }
+
 
 function openPrintPreview(title, bodyContent, archiveData){
   _previewArchiveData=archiveData||null;
