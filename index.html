@@ -1638,18 +1638,36 @@ async function syncFromDB(){
 
 async function resolveUnitId() {
   if (!sbClient) return;
-  var unitName = getActiveUnit();
-  if (unitName === 'default') {
+  var localId = getActiveUnit();
+  if (localId === 'default') {
     activeUnitId = null;
     return;
   }
+  
+  // First check if the local unit has a _dbId already
+  var units = getUnits();
+  var localUnit = units.find(function(u){return u.id === localId;});
+  if(localUnit && localUnit._dbId){
+    activeUnitId = localUnit._dbId;
+    dbLog('Unit resolved from local _dbId: '+activeUnitId);
+    return;
+  }
+  
+  // Try to find by name in DB
+  var unitName = localUnit ? (localUnit.name || localUnit.unitName || localId) : localId;
   var result = await dbCall(async () => {
-    dbLog('Resolving unit: '+unitName); var { data, error } = await sbClient.from('pms_units').select('id').eq('name', unitName);
+    dbLog('Resolving unit: '+unitName);
+    var { data, error } = await sbClient.from('pms_units').select('id').eq('name', unitName);
     if (error) throw error;
     return (data && data.length > 0) ? data[0] : null;
   });
   if (result) {
     activeUnitId = result.id;
+    // Store _dbId back on local unit
+    if(localUnit) {
+      localUnit._dbId = result.id;
+      saveUnits(units);
+    }
     dbLog('Unit resolved: '+activeUnitId);
   } else {
     activeUnitId = null;
@@ -3503,7 +3521,34 @@ function getUnits(){ return JSON.parse(localStorage.getItem('pms_units')||'[]');
 async function syncUnits(){
   var dbUnits = await getUnitsDB();
   if(dbUnits && dbUnits.length > 0){
-    localStorage.setItem('pms_units', JSON.stringify(dbUnits));
+    // Merge DB units into local units list
+    var localUnits = getUnits();
+    dbUnits.forEach(function(dbu){
+      // Check if this DB unit already exists locally
+      var existing = localUnits.find(function(lu){
+        return lu._dbId === dbu._dbId || lu.id === dbu._dbId || 
+               (lu.name && lu.name === dbu.unitName) || 
+               (lu.unitName && lu.unitName === dbu.unitName);
+      });
+      if(existing){
+        // Update local with DB info
+        existing._dbId = dbu._dbId;
+        existing.unitName = dbu.unitName;
+        existing.name = dbu.unitName;
+        existing.designation = dbu.designation;
+      } else {
+        // Add DB unit to local list
+        localUnits.push({
+          id: 'db_' + dbu._dbId,
+          name: dbu.unitName,
+          unitName: dbu.unitName,
+          designation: dbu.designation || '',
+          systems: dbu.systems || [],
+          _dbId: dbu._dbId
+        });
+      }
+    });
+    localStorage.setItem('pms_units', JSON.stringify(localUnits));
   }
   return getUnits();
 }
@@ -6940,8 +6985,20 @@ function showChuteHistory(sn){
 
 
 async function syncFromCloud(){
-  if(!sbClient||!activeUnitId){toast('Not connected to database','warning');return;}
+  if(!sbClient){toast('Not connected to database','warning');return;}
   toast('Syncing from cloud...','info',2000);
+  await syncUnits();
+  await resolveUnitId();
+  if(!activeUnitId){
+    var dbUnits=await getUnitsDB();
+    if(dbUnits&&dbUnits.length>0){
+      toast('Found '+dbUnits.length+' unit(s) in cloud. Select one on the Home page.','info',5000);
+      renderHome();
+    } else {
+      toast('No units found in cloud','warning');
+    }
+    return;
+  }
   var success=await loadFromDB();
   if(success){
     try{localStorage.setItem(getStorageKey(),JSON.stringify(S));}catch(e){}
