@@ -2500,6 +2500,7 @@ function sectionHTML(sec){
           <button class="btn btn-secondary btn-sm" onclick="bulkFill(${sec.id})">📋 Bulk Fill Selected</button>
           <button class="btn btn-secondary btn-sm" onclick="printPackLog(${sec.id})">🖨 Pack Log</button>
           <button class="btn btn-secondary btn-sm" onclick="printFISheet(${sec.id})">🖨 FI Sheet</button>
+          <button class="btn btn-secondary btn-sm" onclick="saveToArchive(${sec.id})">💾 Save to Archive</button>
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);margin-bottom:6px;">
@@ -3018,6 +3019,45 @@ function toggleArchiveMonth(label){
   if(el) el.style.display=el.style.display==='none'?'block':'none';
 }
 
+
+function saveToArchive(secId){
+  var sec=S.sections.find(function(s){return s.id===secId;});
+  if(!sec) return;
+  
+  var now=new Date();
+  var label=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  
+  if(!S.monthlySnapshots) S.monthlySnapshots=[];
+  
+  // Find or create snapshot for this month
+  var snapshot=S.monthlySnapshots.find(function(s){return s.label===label;});
+  if(!snapshot){
+    createSnapshot(label);
+    save();
+    renderArchive();
+    toast('Saved to archive: '+label,'success');
+  } else {
+    // Update the existing snapshot with current section data
+    var existingSec=snapshot.sections.find(function(s){return s.binLocation===sec.binLocation&&s.systemType===sec.systemType;});
+    var newSecData={
+      binLocation:sec.binLocation, systemType:sec.systemType, maxChutes:sec.maxChutes,
+      rowCount:sec.rows.length,
+      rows:sec.rows.map(function(r){return{serialNumber:r.serialNumber,dom:r.dom,pis:r.pis,osd:r.osd,dbag:r.dbag,packer:r.packer,ip:r.ip,packDate:r.packDate,expirationDate:r.expirationDate};})
+    };
+    if(existingSec){
+      // Replace
+      var idx=snapshot.sections.indexOf(existingSec);
+      snapshot.sections[idx]=newSecData;
+    } else {
+      snapshot.sections.push(newSecData);
+    }
+    snapshot.date=new Date().toISOString();
+    save();
+    renderArchive();
+    toast('Updated archive for '+sec.binLocation+' in '+label,'success');
+  }
+}
+
 function createManualSnapshot(label){
   if(!S.monthlySnapshots) S.monthlySnapshots=[];
   // Remove existing snapshot for this month
@@ -3100,14 +3140,16 @@ function printArchiveFI(monthLabel,packerName){
   
   var now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   var body='<h1>Final Inspection Sheet — '+monthLabel+'</h1>';
-  body+='<div class="header-info">Packer: '+esc(packerName)+' · '+allRows.length+' inspections · Generated: '+now+'</div>';
+  body+='<div class="header-info">Packer: '+esc(packerName)+' · '+allRows.length+' chutes · Generated: '+now+'</div>';
   body+='<table><thead><tr><th>#</th><th>Section</th><th>System</th><th>Serial Number</th><th>DOM</th><th>PIS</th><th>D-Bag</th><th>IP</th><th>Pack Date</th></tr></thead><tbody>';
   allRows.forEach(function(item,idx){
     var r=item.r,sec=item.sec;
     body+='<tr><td>'+(idx+1)+'</td><td>'+esc(sec.binLocation)+'</td><td>'+sec.systemType+'</td><td>'+esc(r.serialNumber||'')+'</td><td>'+(r.dom||'\u2014')+'</td><td>'+(r.pis||'\u2014')+'</td><td>'+esc(r.dbag||'\u2014')+'</td><td>'+esc(r.ip||'\u2014')+'</td><td>'+(r.packDate||'\u2014')+'</td></tr>';
   });
   body+='</tbody></table>';
-  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Inspector: '+esc(packerName)+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
+  var ips={};allRows.forEach(function(item){if(item.r.ip)ips[item.r.ip]=true;});
+  var ipList=Object.keys(ips).join(', ')||'N/A';
+  body+='<div class="sig-line"><div class="sig-block"><div class="sig-label">Inspector (FI): '+esc(ipList)+'</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Signature</div><div class="sig-field"></div></div><div class="sig-block"><div class="sig-label">Date</div><div class="sig-field"></div></div></div>';
   body+='<div class="footer">Parachute Management System — Archive FI Sheet — '+monthLabel+'</div>';
   openPrintPreview('FI Sheet — '+esc(packerName)+' — '+monthLabel, body);
 }
@@ -6287,6 +6329,34 @@ function opsScanSignIn(signOutIdx){
     toast(sn+' already scanned in','warning');return;
   }
   
+  // Check if we've already scanned enough live chutes for this system type
+  var sys=scannedRecord.system;
+  var isMulti=document.getElementById('opsSignInMulti')&&document.getElementById('opsSignInMulti').value==='1';
+  var allowedLive=0;
+  
+  if(isMulti){
+    var safeId=sys.replace(/[^a-zA-Z0-9]/g,'_');
+    var liveEl=document.getElementById('opsLive_'+safeId);
+    allowedLive=liveEl?parseInt(liveEl.value)||0:0;
+  } else {
+    allowedLive=parseInt(document.getElementById('opsLiveCount').value)||0;
+  }
+  
+  // Count how many of this system are already scanned in
+  var alreadyScanned=S._opsSignInLog.filter(function(e){return e.system===sys;}).length;
+  
+  if(alreadyScanned>=allowedLive){
+    toast('Already scanned '+alreadyScanned+'/'+allowedLive+' live '+sys+'. That chute should be popped.','error');
+    return;
+  }
+  
+  // Check total scans vs total live
+  var totalLive=parseInt(document.getElementById('opsLiveCount').value)||0;
+  if(S._opsSignInLog.length>=totalLive){
+    toast('All '+totalLive+' live chutes already scanned. Remaining are popped.','error');
+    return;
+  }
+  
   var now=new Date();
   var expDate=scannedRecord.rowData&&scannedRecord.rowData.expirationDate?new Date(scannedRecord.rowData.expirationDate+'T00:00:00'):null;
   var daysLeft=expDate?Math.ceil((expDate-now)/(24*60*60*1000)):999;
@@ -6295,7 +6365,7 @@ function opsScanSignIn(signOutIdx){
   var binName=scannedRecord.bin+' ('+scannedRecord.system+')';
   
   S._opsSignInLog.push({sn:sn,bin:binName,system:scannedRecord.system,expStatus:expStatus,expColor:expColor});
-  toast(sn+' \u2192 '+scannedRecord.bin+(daysLeft<=30?' \u26A0 '+expStatus:''),'success',3000);
+  toast(sn+' \u2192 '+scannedRecord.bin+' ('+alreadyScanned+1+'/'+allowedLive+' '+sys+')'+(daysLeft<=30?' \u26A0 '+expStatus:''),'success',3000);
   opsRenderSignInLog(signOutIdx);
 }
 
