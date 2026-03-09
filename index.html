@@ -6970,7 +6970,6 @@ function openBarcodeScanner(callback){
   _scanCallback=callback;
   _scanActive=true;
   
-  // Create scanner overlay
   var overlay=document.createElement('div');
   overlay.id='scannerOverlay';
   overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;';
@@ -6979,89 +6978,81 @@ function openBarcodeScanner(callback){
     '<div id="scannerViewport" style="width:90%;max-width:400px;height:300px;border:2px solid #6366f1;border-radius:8px;overflow:hidden;position:relative;background:#000;">'+
     '<div style="position:absolute;top:50%;left:10%;right:10%;height:2px;background:rgba(239,68,68,0.7);z-index:1;"></div>'+
     '</div>'+
-    '<div id="scannerResult" style="color:#6366f1;font-size:14px;font-weight:600;margin-top:12px;min-height:20px;"></div>'+
+    '<div id="scannerResult" style="color:#6366f1;font-size:14px;font-weight:600;margin-top:12px;min-height:20px;">Requesting camera...</div>'+
     '<div style="margin-top:16px;display:flex;gap:12px;">'+
     '<button onclick="closeBarcodeScanner()" style="padding:10px 24px;background:#374151;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">Cancel</button>'+
     '</div>';
   
   document.body.appendChild(overlay);
   
-  // Start Quagga
   if(typeof Quagga==='undefined'){
-    document.getElementById('scannerResult').textContent='Scanner library not loaded. Type manually.';
+    document.getElementById('scannerResult').textContent='Scanner library not loaded. Check internet.';
     return;
   }
   
+  // Request camera permission explicitly, then start scanner
+  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(stream){
+      // Got permission - stop test stream and start Quagga
+      stream.getTracks().forEach(function(t){t.stop();});
+      document.getElementById('scannerResult').textContent='Camera ready...';
+      initQuaggaScanner();
+    }).catch(function(err){
+      document.getElementById('scannerResult').textContent='Camera denied: '+(err.message||err);
+    });
+  } else {
+    document.getElementById('scannerResult').textContent='Camera not available on this device.';
+  }
+}
+
+function initQuaggaScanner(){
   Quagga.init({
     inputStream:{
-      name:"Live",
-      type:"LiveStream",
+      name:"Live",type:"LiveStream",
       target:document.getElementById('scannerViewport'),
-      constraints:{
-        facingMode:"environment",
-        width:{ideal:640},
-        height:{ideal:480}
-      }
+      constraints:{facingMode:"environment",width:{ideal:640},height:{ideal:480}}
     },
-    decoder:{
-      readers:["code_128_reader","code_39_reader","ean_reader","ean_8_reader"]
-    },
-    locate:true,
-    frequency:10
+    decoder:{readers:["code_128_reader","code_39_reader","ean_reader","ean_8_reader"]},
+    locate:true,frequency:10
   }, function(err){
     if(err){
       console.log('Scanner error:',err);
-      document.getElementById('scannerResult').textContent='Camera error: '+err.message;
+      var el=document.getElementById('scannerResult');
+      if(el) el.textContent='Camera error: '+(err.message||err);
       return;
     }
     Quagga.start();
+    var el=document.getElementById('scannerResult');
+    if(el) el.textContent='Point at barcode...';
   });
   
   Quagga.onDetected(function(result){
     var code=result.codeResult.code;
     if(!code) return;
     
-    // Show result briefly
     var el=document.getElementById('scannerResult');
     if(el) el.textContent='Scanned: '+code;
-    
-    // Vibrate if supported
     if(navigator.vibrate) navigator.vibrate(100);
     
-    // Check if this serial exists anywhere in the system
-    var found=false;
-    var location='';
-    S.sections.forEach(function(sec){
-      sec.rows.forEach(function(r){
-        if(r.serialNumber===code){found=true;location=sec.binLocation+' ('+sec.systemType+')';}
-      });
-    });
-    if(!found && S.masterInventory && S.masterInventory[code]){
-      found=true;location='Inventory (not in a section)';
-    }
-    // Check signed out
-    if(!found){
-      (S.signedOut||[]).forEach(function(so){
-        (so.scannedOut||[]).forEach(function(s){
-          if(s.sn===code){found=true;location='Signed out to '+(so.unit||'?');}
-        });
-      });
-    }
+    var found=false;var location='';
+    S.sections.forEach(function(sec){sec.rows.forEach(function(r){
+      if(r.serialNumber===code){found=true;location=sec.binLocation+' ('+sec.systemType+')';}
+    });});
+    if(!found&&S.masterInventory&&S.masterInventory[code]){found=true;location='Inventory (not in a section)';}
+    if(!found){(S.signedOut||[]).forEach(function(so){(so.scannedOut||[]).forEach(function(s){
+      if(s.sn===code){found=true;location='Signed out to '+(so.unit||'?');}
+    });});}
     
-    // Close and callback
     closeBarcodeScanner();
     if(_scanCallback) _scanCallback(code);
     
-    // Show status toast after callback processes
     setTimeout(function(){
-      if(found){
-        toast(code+' found: '+location,'info',3000);
-      } else {
-        toast(code+' not found in system - new serial number','warning',4000);
-      }
+      if(found) toast(code+' found: '+location,'info',3000);
+      else toast(code+' not found in system - new serial number','warning',4000);
     },300);
   });
 }
+
 
 function closeBarcodeScanner(){
   _scanActive=false;
