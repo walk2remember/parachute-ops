@@ -2190,38 +2190,36 @@ function renderUnifiedBar(){
   var systems=getUnitSystems();
   var html='';
   EQUIPMENT_TYPES.forEach(function(eq){
-    var sysEntries=S.equipmentCounts[eq]||{};
-    if(Array.isArray(sysEntries)){S.equipmentCounts[eq]={};sysEntries=S.equipmentCounts[eq];}
-    var colContent='';
-    var addedSystems=[];
-    systems.forEach(function(sys){
-      if(!sysEntries[sys]) return;
-      var entries=sysEntries[sys];
-      if(!Array.isArray(entries)) entries=[entries];
-      if(entries.length===0) return;
-      addedSystems.push(sys);
-      var rows='';
-      entries.forEach(function(e,i){
-        rows+='<div class="tracker-card-row" data-eq="'+eq+'" data-eqsys="'+sys+'" data-idx="'+i+'">'
-          +'<input type="text" class="tracker-input bin" value="'+esc(e.bin)+'" placeholder="Bin #" data-fld="bin">'
-          +'<input type="number" class="tracker-input qty" value="'+(e.count||'')+'" min="0" data-fld="count" placeholder="#">'
-          +'<button class="tracker-del-btn" onclick="delEquipSysEntry(\''+eq+"','"+sys+"',"+i+')" title="Remove">\u2715</button></div>';
+    var entries=S.equipmentCounts[eq]||[];
+    // Migrate old format
+    if(!Array.isArray(entries)){
+      var arr=[];
+      Object.keys(entries).forEach(function(sys){
+        var items=entries[sys];
+        if(Array.isArray(items)) items.forEach(function(e){arr.push({bin:sys+' '+(e.bin||''),count:e.count||''});});
       });
-      colContent+='<div class="tracker-card"><div class="tracker-card-label">'+sys
-        +' <button class="tracker-add-btn" onclick="addEquipSysEntry(\''+eq+"','"+sys+'\')" title="Add bin">+</button>'
-        +' <button class="tracker-del-btn" onclick="removeEquipSystem(\''+eq+"','"+sys+'\')" title="Remove">\u2715</button>'
-        +'</div>'+rows+'</div>';
-    });
-    var eqSelf=[eq];
-    var hasIt=addedSystems.indexOf(eq)>=0;
-    var dd='';
-    if(!hasIt){
-      dd='<select class="tracker-input" style="width:auto;margin-top:4px;font-size:10px;padding:3px 6px;color:var(--accent);font-weight:600;cursor:pointer;" onchange="addEquipSystem(\''+eq+"',this.value);this.value=''"+'">';
-      dd+='<option value="">+ Add '+eq+'</option>';
-      dd+='<option value="'+eq+'">'+eq+'</option>';
-      dd+='</select>';
+      entries=arr;
+      S.equipmentCounts[eq]=entries;
     }
-    html+='<div class="tracker-col"><div class="tracker-col-title">'+eq+'</div><div class="tracker-cards">'+colContent+'</div>'+dd+'</div>';
+    if(entries.length===0) entries=[{bin:'',count:''}];
+    S.equipmentCounts[eq]=entries;
+    
+    var rows='';
+    entries.forEach(function(e,idx){
+      rows+='<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">';
+      rows+='<input type="text" value="'+esc(e.bin||'')+'" placeholder="Bin #" style="flex:1;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:4px 6px;font-size:11px;outline:none;" onchange="updEquipEntry(\''+eq+'\','+idx+',\'bin\',this.value)">';
+      rows+='<input type="number" value="'+(e.count||'')+'" placeholder="#" min="0" style="width:50px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:4px 6px;font-size:11px;text-align:center;outline:none;" onchange="updEquipEntry(\''+eq+'\','+idx+',\'count\',this.value)">';
+      rows+='<button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:2px;" onclick="delEquipEntry(\''+eq+'\','+idx+')" title="Remove">\u2715</button>';
+      rows+='</div>';
+    });
+    
+    var total=0;
+    entries.forEach(function(e){total+=parseInt(e.count)||0;});
+    
+    html+='<div class="tracker-col"><div class="tracker-col-title">'+eq+' <span style="font-size:10px;color:var(--text-muted);">('+total+')</span></div>';
+    html+='<div class="tracker-cards">'+rows+'</div>';
+    html+='<button style="background:none;border:1px dashed var(--border);border-radius:4px;color:var(--accent);cursor:pointer;font-size:10px;padding:3px 8px;margin-top:4px;width:100%;" onclick="addEquipEntry(\''+eq+'\')">+ Add Bin</button>';
+    html+='</div>';
   });
   cats.forEach(function(cat){
     var catKey=cat.toLowerCase().replace(/\s+/g,'');
@@ -2305,13 +2303,22 @@ function addStatusEntry(sys,cat){
 function delStatusEntry(sys,cat,idx){
   if(S.statusCounts[sys]?.[cat]?.length>1){ S.statusCounts[sys][cat].splice(idx,1); save(); renderStatusBar(); }
 }
+
+function updEquipEntry(eq,idx,fld,val){
+  if(!S.equipmentCounts[eq]||!S.equipmentCounts[eq][idx]) return;
+  S.equipmentCounts[eq][idx][fld]=fld==='count'?(parseInt(val)||''):val;
+  save();
+}
 function addEquipEntry(eq){
   if(!S.equipmentCounts) S.equipmentCounts={};
-  if(!S.equipmentCounts[eq]) S.equipmentCounts[eq]=[{bin:'',count:''}];
-  S.equipmentCounts[eq].push({bin:'',count:''}); save(); renderStatusBar();
+  if(!Array.isArray(S.equipmentCounts[eq])) S.equipmentCounts[eq]=[];
+  S.equipmentCounts[eq].push({bin:'',count:''}); save(); renderUnifiedBar();
 }
 function delEquipEntry(eq,idx){
-  if(S.equipmentCounts[eq]?.length>1){ S.equipmentCounts[eq].splice(idx,1); save(); renderStatusBar(); }
+  if(!Array.isArray(S.equipmentCounts[eq])) return;
+  S.equipmentCounts[eq].splice(idx,1);
+  if(S.equipmentCounts[eq].length===0) S.equipmentCounts[eq]=[{bin:'',count:''}];
+  save(); renderUnifiedBar();
 }
 
 // Extract the bin number from a bin name for duplicate comparison
@@ -3951,20 +3958,72 @@ function closeWizard(){
   if(o) o.remove();
 }
 
+var _pendingUnitDelete=null;
+
 function deleteUnit(){
   const id=getActiveUnit();
   if(id==='default'){toast('Cannot delete default unit','error');return;}
   const units=getUnits();
   const unit=units.find(u=>u.id===id);
-  showConfirm('Delete Unit','Delete <strong>'+esc(unit?.name||'this unit')+'</strong> and all its data?',
+  showConfirm('Delete Unit','Delete <strong>'+esc(unit?.name||'this unit')+'</strong> and all its data? You will have 10 seconds to undo.',
     [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
      {label:'Delete',cls:'btn-danger',fn:function(){
+       // Store unit data for undo
+       var unitData=null;
+       try{unitData=localStorage.getItem('pms_data_'+id);}catch(e){}
+       _pendingUnitDelete={id:id,unit:JSON.parse(JSON.stringify(unit)),unitData:unitData,units:JSON.parse(JSON.stringify(units))};
+       
+       // Remove locally
        const filtered=units.filter(u=>u.id!==id);
        saveUnits(filtered);
        localStorage.removeItem('pms_data_'+id);
        setActiveUnit('default');
-       toast('🗑 Unit deleted','success');
+       
+       // Show undo toast
+       toast('Unit deleted. <button onclick="undoDeleteUnit()" style="background:var(--accent);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;margin-left:8px;font-weight:600;">UNDO</button>','warning',30000);
+       
+       // Schedule permanent cloud delete after 30 seconds
+       _pendingUnitDelete.timer=setTimeout(function(){
+         permanentDeleteUnit(_pendingUnitDelete);
+         _pendingUnitDelete=null;
+       },30000);
      }}]);
+}
+
+function undoDeleteUnit(){
+  if(!_pendingUnitDelete) return;
+  clearTimeout(_pendingUnitDelete.timer);
+  
+  // Restore local data
+  saveUnits(_pendingUnitDelete.units);
+  if(_pendingUnitDelete.unitData){
+    localStorage.setItem('pms_data_'+_pendingUnitDelete.id, _pendingUnitDelete.unitData);
+  }
+  setActiveUnit(_pendingUnitDelete.id);
+  _pendingUnitDelete=null;
+  toast('Unit restored','success');
+}
+
+function permanentDeleteUnit(pending){
+  if(!pending||!pending.unit) return;
+  var unit=pending.unit;
+  if(sbClient && unit._dbId){
+    (async function(){
+      try{
+        var secs=await sbClient.from('pms_sections').select('id').eq('unit_id',unit._dbId);
+        var secIds=(secs.data||[]).map(function(s){return s.id;});
+        if(secIds.length>0) await sbClient.from('pms_pack_records').delete().in('section_id',secIds);
+        await sbClient.from('pms_sections').delete().eq('unit_id',unit._dbId);
+        await sbClient.from('pms_master_inventory').delete().eq('unit_id',unit._dbId);
+        await sbClient.from('pms_status_counts').delete().eq('unit_id',unit._dbId);
+        await sbClient.from('pms_equipment_counts').delete().eq('unit_id',unit._dbId);
+        await sbClient.from('pms_signed_out').delete().eq('unit_id',unit._dbId);
+        await sbClient.from('pms_audit_log').delete().eq('unit_id',unit._dbId);
+        await sbClient.from('pms_units').delete().eq('id',unit._dbId);
+        dbLog('Unit permanently deleted from cloud');
+      }catch(e){dbLog('Delete unit error: '+e.message);}
+    })();
+  }
 }
 
 function openFacilityConfig(){
