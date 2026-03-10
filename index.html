@@ -2113,61 +2113,61 @@ function toggleUnitAccess(userName, unitId, granted){
 }
 
 function renderAdmin(){
-  // Users list
   var ul=document.getElementById('usersList');
   if(ul){
     var users=getUsers();
+    var allUnits=getUnits().filter(function(u){return u.id!=='default';});
     var html='';
-    users.forEach(function(u){
-      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;">';
-      html+='<div><span class="user-pill role-'+(u.role==='masteradmin'?'admin':u.role)+'">'+esc(u.lastName||u.name)+'</span> <span style="font-size:11px;color:var(--text-muted);margin-left:6px;">'+(u.role==='masteradmin'?'admin':u.role)+'</span></div>';
-      html+='<div style="display:flex;gap:6px;">';
-      if(currentUser.role==='masteradmin'){
-          if(u.name!==currentUser.name) html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="editUserRole(\''+esc(u.name)+'\')">Edit</button>';
-          if(u.name!==currentUser.name) html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 8px;color:var(--danger);" onclick="deleteUser(\''+esc(u.name)+'\')">Delete</button>';
-        } else if(currentUser.role==='admin'&&(u.role==='rigger'||u.role==='viewer')){
-          html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="editUserRole(\''+esc(u.name)+'\')">Edit</button>';
-          html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 8px;color:var(--danger);" onclick="deleteUser(\''+esc(u.name)+'\')">Delete</button>';
-        }
-      html+='</div></div>';
-
-  // Unit Access Control
-  html+='<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">';
-  html+='<div style="font-size:14px;font-weight:600;margin-bottom:10px;">Unit Access Control</div>';
-  html+='<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Assign which users can access which units. Admins see all units.</div>';
-  var allUsers=getUsers();
-  var allUnits=getUnits().filter(function(u){return u.id!=='default';});
-  if(allUnits.length===0){
-    html+='<div style="color:var(--text-muted);font-size:12px;">No units created yet.</div>';
-  } else {
-    html+='<table class="data-table" style="font-size:11px;"><thead><tr><th>User</th><th>Role</th>';
-    allUnits.forEach(function(u){
-      var uname=u.name||u.unitName||u.id;
-      html+='<th style="text-align:center;max-width:80px;">'+esc(uname)+'</th>';
-    });
-    html+='</tr></thead><tbody>';
-    allUsers.forEach(function(user){
-      var isAdm=user.role==='admin'||user.role==='masteradmin';
-      var access=user.unitAccess||[];
-      html+='<tr><td style="font-weight:600;">'+esc(user.name)+'</td>';
-      html+='<td>'+(user.role==='masteradmin'?'admin':user.role)+'</td>';
+    
+    // Single unified user table
+    html+='<table class="data-table" style="font-size:12px;"><thead><tr>';
+    html+='<th>Name</th><th>Role</th>';
+    if(allUnits.length>0){
       allUnits.forEach(function(u){
-        var uid=u.id;
-        if(isAdm){
-          html+='<td style="text-align:center;color:var(--success);">\u2713</td>';
-        } else {
-          var has=access.indexOf(uid)>=0;
-          html+='<td style="text-align:center;"><input type="checkbox" '+(has?'checked':'')+' onchange="toggleUnitAccess(\''+esc(user.name)+'\',\''+uid+'\',this.checked)"></td>';
-        }
+        var uname=u.name||u.unitName||u.id;
+        html+='<th style="text-align:center;font-size:10px;max-width:70px;overflow:hidden;text-overflow:ellipsis;">'+esc(uname)+'</th>';
       });
-      html+='</tr>';
+    }
+    html+='<th style="text-align:right;">Actions</th></tr></thead><tbody>';
+    
+    users.forEach(function(u){
+      var isAdm=u.role==='admin'||u.role==='masteradmin';
+      var access=u.unitAccess||[];
+      var roleLabel=u.role==='masteradmin'?'admin':u.role;
+      
+      html+='<tr>';
+      html+='<td style="font-weight:600;">'+esc(u.lastName||u.name)+'</td>';
+      html+='<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:var(--accent-dim);color:var(--accent);">'+roleLabel+'</span></td>';
+      
+      // Unit access checkboxes
+      if(allUnits.length>0){
+        allUnits.forEach(function(unit){
+          var uid=unit.id;
+          if(isAdm){
+            html+='<td style="text-align:center;color:var(--success);font-size:14px;">\u2713</td>';
+          } else {
+            var has=access.indexOf(uid)>=0;
+            html+='<td style="text-align:center;"><input type="checkbox" '+(has?'checked':'')+' onchange="toggleUnitAccess(\''+esc(u.name)+'\',\''+uid+'\',this.checked)"></td>';
+          }
+        });
+      }
+      
+      // Actions
+      html+='<td style="text-align:right;white-space:nowrap;">';
+      var canEdit=false;
+      if(currentUser.role==='masteradmin'&&u.name!==currentUser.name) canEdit=true;
+      if(currentUser.role==='admin'&&(u.role==='rigger'||u.role==='viewer')) canEdit=true;
+      if(canEdit){
+        html+='<button class="btn btn-secondary" style="font-size:10px;padding:2px 6px;margin-right:4px;" onclick="editUserRole(\''+esc(u.name)+'\')">Edit</button>';
+        html+='<button class="btn btn-secondary" style="font-size:10px;padding:2px 6px;color:var(--danger);" onclick="deleteUser(\''+esc(u.name)+'\')">Del</button>';
+      }
+      html+='</td></tr>';
     });
+    
     html+='</tbody></table>';
-  }
-  html+='</div>';
-    });
     ul.innerHTML=html;
   }
+  
   // Session info
   var si=document.getElementById('sessionInfo');
   if(si&&currentUser){
@@ -2181,8 +2181,6 @@ function renderAdmin(){
   }
   renderAuditLog();
 }
-
-
 
 function renderUnifiedBar(){
   var bar=document.getElementById('unifiedBar');
