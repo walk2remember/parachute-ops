@@ -441,6 +441,7 @@
       <button class="nav-tab" data-page="csvupload">Upload Files</button>
       <button class="nav-tab" data-page="admin">Admin</button>
       <button class="btn btn-secondary" onclick="syncFromCloud()" style="padding:4px 8px;font-size:10px;margin-left:auto;" title="Sync from cloud">🔄 Sync</button>
+      <button class="btn btn-secondary" onclick="showHelp()" style="padding:4px 8px;font-size:10px;" title="Help & Tutorial">❓ Help</button>
     </div>
   </div>
 </div>
@@ -2091,6 +2092,62 @@ function exportAuditLog(){
 }
 
 // ══ ADMIN PAGE RENDER ══
+
+  // ═══ Unit Access Control ═══
+  html+='<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">';
+  html+='<div style="font-size:14px;font-weight:600;margin-bottom:10px;">Unit Access Control</div>';
+  html+='<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Assign which users can access which units. Admins can see all units.</div>';
+  
+  var allUsers=getUsers();
+  var allUnits=getUnits().filter(function(u){return u.id!=='default';});
+  
+  if(allUnits.length===0){
+    html+='<div style="color:var(--text-muted);font-size:12px;">No units created yet.</div>';
+  } else {
+    html+='<table class="data-table" style="font-size:11px;"><thead><tr><th>User</th><th>Role</th>';
+    allUnits.forEach(function(u){
+      var name=u.name||u.unitName||u.id;
+      html+='<th style="text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;">'+esc(name)+'</th>';
+    });
+    html+='</tr></thead><tbody>';
+    
+    allUsers.forEach(function(user){
+      var isAdmin=user.role==='admin'||user.role==='masteradmin';
+      var access=user.unitAccess||[];
+      html+='<tr><td style="font-weight:600;">'+esc(user.name)+'</td>';
+      html+='<td>'+(user.role==='masteradmin'?'admin':user.role)+'</td>';
+      allUnits.forEach(function(u){
+        var unitId=u.id;
+        var hasAccess=isAdmin||access.indexOf(unitId)>=0;
+        if(isAdmin){
+          html+='<td style="text-align:center;color:var(--success);">\u2713</td>';
+        } else {
+          html+='<td style="text-align:center;"><input type="checkbox" '+(hasAccess?'checked':'')+' onchange="toggleUnitAccess(\''+esc(user.name)+'\',\''+unitId+'\',this.checked)"></td>';
+        }
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table>';
+  }
+  html+='</div>';
+
+  
+
+function toggleUnitAccess(userName, unitId, granted){
+  var users=getUsers();
+  var user=users.find(function(u){return u.name===userName;});
+  if(!user) return;
+  if(!user.unitAccess) user.unitAccess=[];
+  if(granted){
+    if(user.unitAccess.indexOf(unitId)<0) user.unitAccess.push(unitId);
+  } else {
+    user.unitAccess=user.unitAccess.filter(function(id){return id!==unitId;});
+  }
+  saveUsers(users);
+  if(sbClient) saveUsersDB();
+  auditLog('config','Unit Access','Set '+userName+' access to '+unitId+': '+(granted?'granted':'revoked'));
+  toast(userName+' access '+(granted?'granted':'revoked'),'success',2000);
+}
 
 function renderAdmin(){
   // Users list
@@ -4037,7 +4094,18 @@ function renderHome(){
   html+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
     <div style="flex:1;">
       <select id="unitSwitcher" onchange="setActiveUnit(this.value)" style="${inputStyle}max-width:400px;">`;
-  units.forEach(u=>{
+  // Filter units by access (admins see all)
+  var isAdminUser=currentUser&&(currentUser.role==='admin'||currentUser.role==='masteradmin');
+  var userAccess=[];
+  if(currentUser){
+    var cu=getUsers().find(function(u){return u.name===currentUser.name;});
+    if(cu) userAccess=cu.unitAccess||[];
+  }
+  units.filter(function(u){
+    if(isAdminUser) return true;
+    if(u.id==='default') return true;
+    return userAccess.indexOf(u.id)>=0;
+  }).forEach(u=>{
     const label=u.name||u.designation||'Unnamed Unit';
     html+=`<option value="${u.id}" ${u.id===getActiveUnit()?'selected':''}>${esc(label)}${u.designation?' ('+esc(u.designation)+')':''}</option>`;
   });
@@ -7022,6 +7090,38 @@ function renderAll(){
   try{renderArchive();}catch(e){}
   try{renderInventory();}catch(e){}
   try{updateUserDisplay();}catch(e){}
+}
+
+
+// ══ HELP / USER GUIDE ══
+function showHelp(){
+  var html='<div style="text-align:left;max-height:70vh;overflow-y:auto;padding-right:8px;">';
+  
+  html+='<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Tap any section to expand.</div>';
+  
+  var sections=[
+    {title:"Getting Started",content:"Open <strong>riggershub.github.io/parachute-ops</strong> in Chrome or Safari.<br><br><strong>Install as App:</strong><br>Android: Chrome menu > Install app<br>iPhone: Share button > Add to Home Screen<br><br>DuckDuckGo does not support camera or PWA features."},
+    {title:"Logging In",content:"<strong>First time:</strong> Click Create New Account, enter your last name and a 4-10 digit PIN.<br><br><strong>Daily:</strong> Select your name from dropdown, enter PIN, click Log In.<br><br><strong>Roles:</strong> Viewer (read-only), Rigger (add/edit), Admin (manage users and sections)."},
+    {title:"Rigger Pack Records",content:"<strong>Add Section:</strong> Click + Add Section, enter bin location, system type, max chutes.<br><br><strong>Quick Entry:</strong> Type or scan a serial number in the Quick Entry bar at the top of each section. System auto-fills DOM/PIS and pack date.<br><br><strong>Tab Navigation:</strong> Press Tab to move through fields: S/N > DOM > PIS > D-Bag > Packer > IP > Pack Date > next row.<br><br><strong>Print Pack Log:</strong> Splits by packer AND date. Each combination gets its own page.<br><br><strong>Print FI Sheet:</strong> Asks for FI name per date. Each date gets its own page."},
+    {title:"Issue & Return",content:"<strong>ISSUE (Sign Out):</strong><br>1. Enter unit, date, add system types with quantities<br>2. Calculate Loading Plan (longest-expiring loaded first = back of truck)<br>3. Confirm and scan each chute leaving<br><br><strong>RETURN (Sign In):</strong><br>1. Select the sign-out to process<br>2. Enter live/popped count per system type<br>3. Scan ALL live chutes (required for mixed splits)<br>4. System enforces scan count per system<br>5. Live chutes return to original bin, popped go to tracker"},
+    {title:"PSR / Overview",content:"<strong>Summary Cards:</strong> Total Packed, Capacity (set per system), Signed Out, Popped, Expiring.<br><br><strong>Manual Sign-Out:</strong> Click + Add in the Signed Out section for manual tracking without the Issue system.<br><br>All counts update automatically from actual chute data."},
+    {title:"Archive",content:"Records appear here only when you save them using the Save to Archive button in a print preview.<br><br>Click a month folder to expand and view saved Pack Logs and FI Sheets."},
+    {title:"Inventory & Barcodes",content:"Shows all serial numbers with DOM, PIS, OSD, and current location.<br><br><strong>Print Barcodes:</strong> Print All or Print Selected generates Code 128 barcodes.<br><br><strong>Chute History:</strong> Double-click any S/N in RPR or click one in Inventory to see full lifecycle."},
+    {title:"Barcode Scanning",content:"Tap the camera button next to any scan input.<br><br>Requirements: Chrome or Safari, camera permission allowed.<br><br>Point at a Code 128 barcode. Phone vibrates on detection. Serial number auto-fills."},
+    {title:"Multi-Device Sync",content:"All data syncs to Supabase cloud automatically (3-second delay).<br><br>Other devices pull updates every 30 seconds, or tap Sync button for immediate pull.<br><br><strong>New device setup:</strong> Open app > Log in > Tap Sync > Go to Home > Select your unit from dropdown."},
+    {title:"Admin Functions",content:"<strong>User Management:</strong> Create accounts, change roles, reset PINs, delete users.<br><br><strong>Unit Access:</strong> Assign which users can access which units.<br><br><strong>Audit Log:</strong> Every action logged with user, timestamp, details.<br><br><strong>Clear Local Data:</strong> Wipes device storage without affecting cloud."}
+  ];
+  
+  sections.forEach(function(sec,i){
+    html+='<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px;overflow:hidden;">';
+    html+='<div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'" style="padding:10px 12px;cursor:pointer;font-weight:600;font-size:13px;background:var(--bg-card);display:flex;justify-content:space-between;align-items:center;">'+sec.title+'<span style="color:var(--text-muted);">\u25BC</span></div>';
+    html+='<div style="display:none;padding:10px 12px;font-size:12px;line-height:1.6;color:var(--text-secondary);">'+sec.content+'</div>';
+    html+='</div>';
+  });
+  
+  html+='</div>';
+  
+  showConfirm('Help & User Guide', html, [{label:'Close',cls:'btn-secondary',fn:function(){}}]);
 }
 
 // ══ BARCODE CAMERA SCANNER ══
