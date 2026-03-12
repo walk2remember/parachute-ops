@@ -110,7 +110,7 @@
   .page-title { font-size: 20px; font-weight: 600; }
 
   /* Modal */
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10001; align-items: center; justify-content: center; }
   .modal-overlay.active { display: flex; }
   .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 28px; width: 460px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
   .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
@@ -2196,7 +2196,7 @@ function renderAdmin(){
       html+='<td style="text-align:right;white-space:nowrap;">';
       var canEdit=false;
       if(currentUser.role==='masteradmin'&&u.name!==currentUser.name) canEdit=true;
-      if(currentUser.role==='admin'&&(u.role==='rigger'||u.role==='viewer')) canEdit=true;
+      if(currentUser.role==='admin'&&(u.role==='rigger'||u.role==='pending')) canEdit=true;
       if(canEdit){
         html+='<button class="btn btn-secondary" style="font-size:10px;padding:2px 6px;margin-right:4px;" onclick="editUserRole(\''+esc(u.name)+'\')">Edit</button>';
         html+='<button class="btn btn-secondary" style="font-size:10px;padding:2px 6px;color:var(--danger);" onclick="deleteUser(\''+esc(u.name)+'\')">Del</button>';
@@ -7831,3 +7831,4 @@ if('serviceWorker' in navigator){
 </script>
 </body>
 </html>
+
