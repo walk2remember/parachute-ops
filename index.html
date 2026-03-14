@@ -4275,6 +4275,42 @@ function renderHome(){
   }
   html+=`</div>`;
 
+  // Parachute Requests
+  if(!S.paraRequests) S.paraRequests=[];
+  var sharedReqs2=JSON.parse(localStorage.getItem('pms_shared_requests')||'[]');
+  sharedReqs2.forEach(function(sr){
+    if(!S.paraRequests.find(function(r){return r.id===sr.id;})){
+      S.paraRequests.unshift(sr);
+    }
+  });
+  if(sharedReqs2.length>0){localStorage.setItem('pms_shared_requests','[]');save();}
+  
+  html+='<div class="psr-section"><div class="psr-section-title">\u{1F4CB} Parachute Requests'+(S.paraRequests.length>0?' ('+S.paraRequests.length+')':'')+'</div>';
+  if(S.paraRequests.length>0){
+    S.paraRequests.forEach(function(req,ridx){
+      var statusColors={pending:'#EAB308',approved:'#10B981',disapproved:'#EF4444',negotiate:'#6366F1'};
+      var sc=statusColors[req.status]||'#94A3B8';
+      html+='<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--bg-input);cursor:pointer;" onclick="viewRequest('+ridx+')">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;">';
+      html+='<div><strong>'+esc(req.unitRequesting||'')+'</strong> <span style="font-size:11px;color:'+sc+';font-weight:700;">'+req.status.toUpperCase()+'</span></div>';
+      html+='<div style="font-size:10px;color:var(--text-muted);">'+new Date(req.submittedAt).toLocaleDateString()+'</div>';
+      html+='</div>';
+      html+='<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">'+esc(req.pocName||'')+' | '+esc(req.paraType||'')+' x'+(req.paraQty||0)+' | '+esc(req.airfield||'')+'</div>';
+      if(req.adminRemarks) html+='<div style="font-size:10px;color:var(--accent);margin-top:4px;font-style:italic;">Remarks: '+esc(req.adminRemarks)+'</div>';
+      if(hasRole('admin')&&(req.status==='pending'||req.status==='negotiate')){
+        html+='<div style="display:flex;gap:6px;margin-top:8px;" onclick="event.stopPropagation()">';
+        html+='<button class="btn btn-primary" style="font-size:10px;padding:3px 10px;" onclick="updateRequestStatus('+ridx+',\'approved\')">Approve</button>';
+        html+='<button class="btn btn-danger" style="font-size:10px;padding:3px 10px;" onclick="updateRequestStatus('+ridx+',\'disapproved\')">Deny</button>';
+        html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 10px;" onclick="negotiateRequest('+ridx+')">Negotiate</button>';
+        html+='</div>';
+      }
+      html+='</div>';
+    });
+  } else {
+    html+='<div style="color:var(--text-muted);font-size:12px;padding:8px;">No parachute requests.</div>';
+  }
+  html+='</div>';
+
   c.innerHTML=html;
 }
 
@@ -7380,10 +7416,7 @@ function newParaRequest(){
   
   showConfirm('New Parachute Request', html,
     [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
-     {label:'Submit Request',cls:'btn-primary',fn:function(){
-       alert('Submit clicked - form exists: '+(document.getElementById('rqUnit')!==null));
-       submitParaRequest();
-     }}]);
+     {label:'Submit Request',cls:'btn-primary',fn:function(){submitParaRequest();}}]);
 }
 
 function submitParaRequest(){
@@ -7399,10 +7432,10 @@ function submitParaRequest(){
   pocPhone=pocPhone.trim();
   var paraQty=(document.getElementById('rqParaQty')||{}).value||'0';
   
-  if(!pocName){alert('Enter POC name');return;}
-  if(!pocEmail){alert('Enter POC email');return;}
-  if(!pocPhone){alert('Enter POC phone');return;}
-  if(!paraQty||paraQty==='0'){alert('Enter parachute quantity');return;}
+  if(!pocName){toast('Enter POC name','error');return;}
+  if(!pocEmail){toast('Enter POC email','error');return;}
+  if(!pocPhone){toast('Enter POC phone','error');return;}
+  if(!paraQty||paraQty==='0'){toast('Enter parachute quantity','error');return;}
   
   var req={
     id:'req_'+Date.now(),
@@ -7455,7 +7488,6 @@ function submitParaRequest(){
   var sharedReqs=JSON.parse(localStorage.getItem('pms_shared_requests')||'[]');
   sharedReqs.unshift(req);
   localStorage.setItem('pms_shared_requests',JSON.stringify(sharedReqs));
-  alert('Request saved! Total shared: '+sharedReqs.length+' Unit: '+req.unitRequesting+' Qty: '+req.paraQty);
   
   // Also save to current unit if logged in
   if(currentUser){
