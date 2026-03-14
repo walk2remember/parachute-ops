@@ -4286,27 +4286,39 @@ function renderHome(){
   if(sharedReqs2.length>0){localStorage.setItem('pms_shared_requests','[]');save();}
   
   html+='<div class="psr-section"><div class="psr-section-title">\u{1F4CB} Parachute Requests'+(S.paraRequests.length>0?' ('+S.paraRequests.length+')':'')+'</div>';
-  if(S.paraRequests.length>0){
-    S.paraRequests.forEach(function(req,ridx){
-      var statusColors={pending:'#EAB308',approved:'#10B981',disapproved:'#EF4444',negotiate:'#6366F1'};
-      var sc=statusColors[req.status]||'#94A3B8';
-      html+='<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--bg-input);cursor:pointer;" onclick="viewRequest('+ridx+')">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;">';
-      html+='<div><strong>'+esc(req.unitRequesting||'')+'</strong> <span style="font-size:11px;color:'+sc+';font-weight:700;">'+req.status.toUpperCase()+'</span></div>';
-      html+='<div style="font-size:10px;color:var(--text-muted);">'+new Date(req.submittedAt).toLocaleDateString()+'</div>';
+  // Filter: hide approved/denied older than 7 days
+  var now=new Date();
+  var visibleReqs=S.paraRequests.filter(function(req,idx){
+    if(req.status==='pending'||req.status==='negotiate') return true;
+    if(!req.reviewedAt) return true;
+    var reviewed=new Date(req.reviewedAt);
+    var days=(now-reviewed)/(1000*60*60*24);
+    return days<=7;
+  });
+  
+  visibleReqs.forEach(function(req){
+    var ridx=S.paraRequests.indexOf(req);
+    var statusColors={pending:'#EAB308',approved:'#10B981',disapproved:'#EF4444',negotiate:'#6366F1'};
+    var sc=statusColors[req.status]||'#94A3B8';
+    html+='<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--bg-input);cursor:pointer;" onclick="viewRequest('+ridx+')">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;">';
+    html+='<div><strong>'+esc(req.unitRequesting||'')+'</strong> <span style="font-size:11px;color:'+sc+';font-weight:700;">'+req.status.toUpperCase()+'</span></div>';
+    html+='<div style="display:flex;align-items:center;gap:6px;">';
+    html+='<span style="font-size:10px;color:var(--text-muted);">'+new Date(req.submittedAt).toLocaleDateString()+'</span>';
+    html+='<button class="btn btn-secondary" style="font-size:9px;padding:1px 6px;color:var(--danger);" onclick="event.stopPropagation();deleteRequest('+ridx+')">\u2715</button>';
+    html+='</div></div>';
+    html+='<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">'+esc(req.pocName||'')+' | '+esc(req.paraType||'')+' x'+(req.paraQty||0)+' | '+esc(req.airfield||'')+'</div>';
+    if(req.adminRemarks) html+='<div style="font-size:10px;color:var(--accent);margin-top:4px;font-style:italic;">Remarks: '+esc(req.adminRemarks)+'</div>';
+    if(hasRole('admin')&&(req.status==='pending'||req.status==='negotiate')){
+      html+='<div style="display:flex;gap:6px;margin-top:8px;" onclick="event.stopPropagation()">';
+      html+='<button class="btn btn-primary" style="font-size:10px;padding:3px 10px;" onclick="updateRequestStatus('+ridx+',\'approved\')">Approve</button>';
+      html+='<button class="btn btn-danger" style="font-size:10px;padding:3px 10px;" onclick="updateRequestStatus('+ridx+',\'disapproved\')">Deny</button>';
+      html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 10px;" onclick="negotiateRequest('+ridx+')">Negotiate</button>';
       html+='</div>';
-      html+='<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">'+esc(req.pocName||'')+' | '+esc(req.paraType||'')+' x'+(req.paraQty||0)+' | '+esc(req.airfield||'')+'</div>';
-      if(req.adminRemarks) html+='<div style="font-size:10px;color:var(--accent);margin-top:4px;font-style:italic;">Remarks: '+esc(req.adminRemarks)+'</div>';
-      if(hasRole('admin')&&(req.status==='pending'||req.status==='negotiate')){
-        html+='<div style="display:flex;gap:6px;margin-top:8px;" onclick="event.stopPropagation()">';
-        html+='<button class="btn btn-primary" style="font-size:10px;padding:3px 10px;" onclick="updateRequestStatus('+ridx+',\'approved\')">Approve</button>';
-        html+='<button class="btn btn-danger" style="font-size:10px;padding:3px 10px;" onclick="updateRequestStatus('+ridx+',\'disapproved\')">Deny</button>';
-        html+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 10px;" onclick="negotiateRequest('+ridx+')">Negotiate</button>';
-        html+='</div>';
-      }
-      html+='</div>';
-    });
-  } else {
+    }
+    html+='</div>';
+  });
+  if(visibleReqs.length===0){
     html+='<div style="color:var(--text-muted);font-size:12px;padding:8px;">No parachute requests.</div>';
   }
   html+='</div>';
@@ -7549,6 +7561,25 @@ function updateRequestStatus(ridx,status){
   req.status=status;
   req.reviewedBy=currentUser?currentUser.name:'';
   req.reviewedAt=new Date().toISOString();
+  
+  // If approved, add to PSR signed-out as upcoming commitment
+  if(status==='approved'){
+    if(!S.signedOut) S.signedOut=[];
+    // Check if already added
+    var alreadyAdded=S.signedOut.find(function(so){return so._requestId===req.id;});
+    if(!alreadyAdded){
+      S.signedOut.push({
+        unit:req.unitRequesting||'',
+        system:req.paraType||'',
+        count:req.paraQty||'0',
+        _requestId:req.id,
+        _pickupDate:req.pickupDate||'',
+        _returnDate:req.returnDate||'',
+        _status:'approved'
+      });
+    }
+  }
+  
   save();
   auditLog('request','Request '+status,'Request from '+req.unitRequesting+' '+status+' by '+(currentUser?currentUser.name:''));
   try{renderRequests();}catch(e){}
@@ -7579,7 +7610,8 @@ function deleteRequest(ridx){
      {label:'Delete',cls:'btn-danger',fn:function(){
        S.paraRequests.splice(ridx,1);
        save();
-       renderRequests();
+       try{renderRequests();}catch(e){}
+       try{renderHome();}catch(e){}
        toast('Request deleted','warning');
      }}]);
 }
