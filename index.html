@@ -1021,7 +1021,7 @@ function showConfirm(title,message,actions){
   let h=`<div class="confirm-icon">⚠️</div><div class="confirm-title">${title}</div><div class="confirm-message">${message}</div><div class="confirm-actions">`;
   actions.forEach((a,i)=>{ h+=`<button class="btn ${a.cls||'btn-secondary'}" data-ai="${i}">${a.label}</button>`; });
   h+='</div>'; d.innerHTML=h; o.classList.add('active');
-  d.querySelectorAll('button[data-ai]').forEach(b=>{ b.addEventListener('click',()=>{ o.classList.remove('active'); const idx=+b.dataset.ai; if(actions[idx]?.fn) actions[idx].fn(); }); });
+  d.querySelectorAll('button[data-ai]').forEach(b=>{ b.addEventListener('click',()=>{ const idx=+b.dataset.ai; if(actions[idx]?.fn) actions[idx].fn(); o.classList.remove('active'); }); });
 }
 
 // ── Nav ──
