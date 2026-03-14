@@ -7380,7 +7380,10 @@ function newParaRequest(){
   
   showConfirm('New Parachute Request', html,
     [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
-     {label:'Submit Request',cls:'btn-primary',fn:function(){submitParaRequest();}}]);
+     {label:'Submit Request',cls:'btn-primary',fn:function(){
+       alert('Submit clicked - form exists: '+(document.getElementById('rqUnit')!==null));
+       submitParaRequest();
+     }}]);
 }
 
 function submitParaRequest(){
