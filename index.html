@@ -751,10 +751,17 @@ function esc(s){ return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/
 // Auto-format MM/YY input: 1216→12/16, 316→03/16, 0305→03/05
 function fmtMMYY(val){
   if(!val) return val;
-  val=val.replace(/[^0-9\/]/g,'');
-  if(/^\d{1,2}\/\d{2}$/.test(val)) return val; // already formatted
-  const digits=val.replace(/\//g,'');
+  val=val.trim();
+  // Already in Mon-YY or Mon-YYYY format (e.g. May-12, Jan-14, Nov-2019) - preserve as-is
+  if(/^[a-zA-Z]{3,}-?\d{2,4}$/i.test(val)) return val;
+  // Already in MM/YY format
+  if(/^\d{1,2}\/\d{2}$/.test(val)) return val;
+  // Already in MM/YYYY format
+  if(/^\d{1,2}\/\d{4}$/.test(val)) return val;
+  // Strip non-numeric for pure number inputs
+  var digits=val.replace(/[^0-9]/g,'');
   if(digits.length===4){ return digits.slice(0,2)+'/'+digits.slice(2); }
+  if(digits.length===6){ return digits.slice(0,2)+'/'+digits.slice(2); }
   if(digits.length===3){ return '0'+digits[0]+'/'+digits.slice(1); }
   return val;
 }
@@ -7096,7 +7103,19 @@ function quickScanEntry(secId){
   
   sec.rows.push(row);
   save();
-  renderSections();
+  
+  // Add row to existing table instead of full re-render
+  var tb=document.getElementById('tb-'+secId);
+  if(tb){
+    var temp=document.createElement('tbody');
+    temp.innerHTML=rowHTML(sec,row,sec.rows.length-1);
+    var newRow=temp.querySelector('tr');
+    if(newRow) tb.appendChild(newRow);
+    // Update section header count
+    updateSectionHeader(secId);
+  } else {
+    renderSections();
+  }
   
   // Scroll to the new row and expand section
   var card=document.querySelector('.section-card[data-section-id="'+secId+'"]');
