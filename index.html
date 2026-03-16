@@ -2539,6 +2539,18 @@ function validateSN(secId,ri,sn){
   if(!sn) return;
   const sec=S.sections.find(s=>s.id===secId); if(!sec||!sec.rows||!sec.rows[ri]) return;
 
+  // Check system type mismatch
+  if(S.masterInventory&&S.masterInventory[sn]&&S.masterInventory[sn].systemType){
+    var chuteType=S.masterInventory[sn].systemType;
+    if(chuteType!==sec.systemType){
+      showConfirm('System Type Mismatch',
+        '<strong>'+sn+'</strong> is a <strong>'+chuteType+'</strong> chute but this is a <strong>'+sec.systemType+'</strong> section.',
+        [{label:'Remove',cls:'btn-danger',fn:function(){sec.rows[ri].serialNumber='';save();renderSections();toast('Removed - wrong system type','warning');}},
+         {label:'Add Anyway',cls:'btn-secondary',fn:function(){}}]);
+      return;
+    }
+  }
+
   // Check duplicates
   const dupes=findDupes(sn,secId,ri);
   if(dupes.length>0){
