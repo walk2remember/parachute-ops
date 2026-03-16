@@ -5697,7 +5697,8 @@ function csvDoImport(){
       var osd=calcOSDString(dom,pis);
       if(!S.masterInventory) S.masterInventory={};
       if(!S.masterInventory[sn]){
-        S.masterInventory[sn]={dom:dom,pis:pis,osd:osd};
+        var sysType=(document.getElementById('csvSystem')||{}).value||'T-11';
+        S.masterInventory[sn]={dom:dom,pis:pis,osd:osd,systemType:sysType};
         added++;
       } else {
         // Update existing if blank
@@ -6966,6 +6967,8 @@ function renderInventory(){
     });
     html+='<tr>';
     html+='<td><input type="checkbox" class="inv-cb" data-sn="'+esc(sn)+'"></td>';
+    var sysOpts=['T-11','MC-6','RA-1','T-11R','MC-6R','RA-1R','AEBP','MAWC',''].map(function(s){return '<option value="'+s+'"'+(s===(item.systemType||'')?'selected':'')+'>'+(s||'--')+'</option>';}).join('');
+    html+='<td><select style="background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);padding:2px 4px;font-size:10px;outline:none;" onchange="updateInventoryField(\''+esc(sn)+'\',\'systemType\',this.value)">'+sysOpts+'</select></td>';
     html+='<td style="font-weight:600;cursor:pointer;color:var(--accent);" onclick="showChuteHistory(\''+esc(sn)+'\')" title="Click for history">'+esc(sn)+'</td>';
     html+='<td><input type="text" value="'+esc(item.dom||'')+'" style="background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);padding:2px 5px;font-size:11px;width:65px;outline:none;" onchange="updateInventoryField(\''+esc(sn)+'\',\'dom\',this.value)"></td>';
     html+='<td><input type="text" value="'+esc(item.pis||'')+'" style="background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);padding:2px 5px;font-size:11px;width:65px;outline:none;" onchange="updateInventoryField(\''+esc(sn)+'\',\'pis\',this.value)"></td>';
@@ -7393,7 +7396,7 @@ function buildRequestCard(req,ridx){
 }
 
 function newParaRequest(){
-  var units=['197th STSC','294th','636th IEW BN','Other'];
+  var units=['294th','143rd','19th Group','Other'];
   var aircraft=['C130J','C130H','C17','CH47','UH60','Other'];
   var paraTypes=['T-11 Main','MC6 Main','MC6 Reserve','T-11R Reserve','RA-1','Other'];
   var vehicles=['Box Truck','LMTV','FMTV','5-Ton','Trailer','POV','Other'];
@@ -7431,7 +7434,7 @@ function newParaRequest(){
   html+='<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px;">AIRCRAFT INFO</div>';
   html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Aircraft Type*</label><select id="rqAircraft" style="'+is+'">'+opts(aircraft)+'</select></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Quantity*</label><input id="rqAircraftQty" type="number" min="0" value="1" style="'+is+'"></div>';
+  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Quantity*</label><input id="rqAircraftQty" type="number" min="0" placeholder="Qty" style="'+is+'"></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">In Trail?</label><select id="rqInTrail" style="'+is+'"><option value="No">No</option><option value="Yes">Yes</option></select></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">MALC (Donut)?</label><select id="rqMALC" style="'+is+'"><option value="No">No</option><option value="Yes">Yes</option></select></div>';
   html+='<div style="grid-column:span 2;"><label style="font-size:10px;color:var(--text-muted);display:block;">Other Equipment</label><input id="rqOtherEquip" style="'+is+'" placeholder="Additional equipment needed"></div>';
@@ -7440,12 +7443,12 @@ function newParaRequest(){
   // Parachute Info
   html+='<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px;">PARACHUTE INFO</div>';
   html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Parachute Type*</label><select id="rqParaType" style="'+is+'">'+opts(paraTypes)+'</select></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Quantity*</label><input id="rqParaQty" type="number" min="0" value="0" style="'+is+'"></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Reserves*</label><input id="rqReserves" type="number" min="0" value="0" style="'+is+'"></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">AEBPs*</label><input id="rqAEBP" type="number" min="0" value="0" style="'+is+'"></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">MAWCs*</label><input id="rqMAWC" type="number" min="0" value="0" style="'+is+'"></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">MAWCLs*</label><input id="rqMAWCL" type="number" min="0" value="0" style="'+is+'"></div>';
+  html+='<div id="paraRequestLines" style="grid-column:span 3;"><div class="para-req-line" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;padding:8px;border:1px solid var(--border);border-radius:6px;"><div><label style="font-size:10px;color:var(--text-muted);display:block;">Parachute Type*</label><select class="rqParaType" style="'+is+'">'+opts(paraTypes)+'</select></div><div><label style="font-size:10px;color:var(--text-muted);display:block;">Quantity*</label><input class="rqParaQty" type="number" min="1" placeholder="Qty" style="'+is+'"></div></div></div>';
+  html+='<div style="grid-column:span 3;"><button type="button" onclick="addParaLine()" style="background:none;border:1px dashed var(--border);border-radius:4px;color:var(--accent);cursor:pointer;font-size:11px;padding:4px 12px;margin-bottom:8px;">+ Add Another Chute Type</button></div>';
+  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Reserves*</label><input id="rqReserves" type="number" min="0" placeholder="Qty" style="'+is+'"></div>';
+  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">AEBPs*</label><input id="rqAEBP" type="number" min="0" placeholder="Qty" style="'+is+'"></div>';
+  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">MAWCs*</label><input id="rqMAWC" type="number" min="0" placeholder="Qty" style="'+is+'"></div>';
+  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">MAWCLs*</label><input id="rqMAWCL" type="number" min="0" placeholder="Qty" style="'+is+'"></div>';
   html+='</div>';
   
   // Transport Info
@@ -7463,7 +7466,7 @@ function newParaRequest(){
   html+='<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px;">AIRDROP (if applicable)</div>';
   html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Airdrop Type</label><select id="rqAirdropType" style="'+is+'">'+opts(airdrops)+'</select></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Quantity</label><input id="rqAirdropQty" type="number" min="0" value="0" style="'+is+'"></div>';
+  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Quantity</label><input id="rqAirdropQty" type="number" min="0" placeholder="Qty" style="'+is+'"></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">MRE?</label><select id="rqMRE" style="'+is+'"><option value="No">No</option><option value="Yes">Yes</option></select></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Water Type</label><select id="rqWater" style="'+is+'">'+opts(waterTypes)+'</select></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Ammo Type</label><select id="rqAmmo" style="'+is+'">'+opts(ammoTypes)+'</select></div>';
@@ -7474,10 +7477,10 @@ function newParaRequest(){
   html+='<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px;">SLINGLOAD (if applicable)</div>';
   html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Slingload Type</label><select id="rqSlingType" style="'+is+'">'+opts(slingloads)+'</select></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Quantity</label><input id="rqSlingQty" type="number" min="0" value="0" style="'+is+'"></div>';
+  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Quantity</label><input id="rqSlingQty" type="number" min="0" placeholder="Qty" style="'+is+'"></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Equipment</label><input id="rqSlingEquip" style="'+is+'" placeholder="Equipment to be slung"></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Sling Aircraft</label><select id="rqSlingAircraft" style="'+is+'">'+opts(['None'].concat(aircraft))+'</select></div>';
-  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Sling Aircraft Qty</label><input id="rqSlingAircraftQty" type="number" min="0" value="0" style="'+is+'"></div>';
+  html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Sling Aircraft Qty</label><input id="rqSlingAircraftQty" type="number" min="0" placeholder="Qty" style="'+is+'"></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Aircraft POC</label><input id="rqAircraftPOC" style="'+is+'" placeholder="POC Name"></div>';
   html+='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Aircraft POC Phone</label><input id="rqAircraftPOCPhone" style="'+is+'" placeholder="Phone #"></div>';
   html+='</div>';
@@ -7499,6 +7502,20 @@ function newParaRequest(){
      {label:'Submit Request',cls:'btn-primary',fn:function(){submitParaRequest();}}]);
 }
 
+
+function addParaLine(){
+  var container=document.getElementById('paraRequestLines');
+  if(!container) return;
+  var paraTypes=['T-11 Main','MC6 Main','MC6 Reserve','T-11R Reserve','RA-1','Other'];
+  var is='background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:6px 10px;font-size:12px;font-family:inherit;outline:none;width:100%;';
+  var div=document.createElement('div');
+  div.className='para-req-line';
+  div.style.cssText='display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:6px;padding:8px;border:1px solid var(--border);border-radius:6px;';
+  var opts=paraTypes.map(function(t){return '<option value="'+t+'">'+t+'</option>';}).join('');
+  div.innerHTML='<div><label style="font-size:10px;color:var(--text-muted);display:block;">Type</label><select class="rqParaType" style="'+is+'">'+opts+'</select></div><div><label style="font-size:10px;color:var(--text-muted);display:block;">Qty</label><input class="rqParaQty" type="number" min="1" placeholder="Qty" style="'+is+'"></div><div style="display:flex;align-items:end;"><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:6px;">\u2715</button></div>';
+  container.appendChild(div);
+}
+
 function submitParaRequest(){
   try{
   var unit=document.getElementById('rqUnit');
@@ -7510,12 +7527,22 @@ function submitParaRequest(){
   pocEmail=pocEmail.trim();
   var pocPhone=(document.getElementById('rqPOCPhone')||{}).value||'';
   pocPhone=pocPhone.trim();
-  var paraQty=(document.getElementById('rqParaQty')||{}).value||'0';
+  var paraQty='0'; // collected from multi-line
   
   if(!pocName){toast('Enter POC name','error');return;}
   if(!pocEmail){toast('Enter POC email','error');return;}
   if(!pocPhone){toast('Enter POC phone','error');return;}
-  if(!paraQty||paraQty==='0'){toast('Enter parachute quantity','error');return;}
+  
+  // Collect multi-line chute types
+  var paraLines=[];
+  document.querySelectorAll('.para-req-line').forEach(function(el){
+    var t=el.querySelector('.rqParaType');
+    var q=el.querySelector('.rqParaQty');
+    if(t&&q&&q.value) paraLines.push({type:t.value,qty:q.value});
+  });
+  if(paraLines.length===0){toast('Add at least one chute type with quantity','error');return;}
+  var paraSummary=paraLines.map(function(p){return p.type+' x'+p.qty;}).join(', ');
+  var totalParaQty=paraLines.reduce(function(s,p){return s+parseInt(p.qty||0);},0);
   
   var req={
     id:'req_'+Date.now(),
@@ -7535,8 +7562,9 @@ function submitParaRequest(){
     inTrail:document.getElementById('rqInTrail').value,
     malc:document.getElementById('rqMALC').value,
     otherEquip:document.getElementById('rqOtherEquip').value.trim(),
-    paraType:document.getElementById('rqParaType').value,
-    paraQty:document.getElementById('rqParaQty').value,
+    paraLines:paraLines,
+    paraType:paraSummary,
+    paraQty:String(totalParaQty),
     reserves:document.getElementById('rqReserves').value,
     aebp:document.getElementById('rqAEBP').value,
     mawc:document.getElementById('rqMAWC').value,
@@ -7564,19 +7592,33 @@ function submitParaRequest(){
     adminRemarks:''
   };
   
-  // Save to shared requests (accessible from any unit/login page)
-  var sharedReqs=JSON.parse(localStorage.getItem('pms_shared_requests')||'[]');
-  sharedReqs.unshift(req);
-  localStorage.setItem('pms_shared_requests',JSON.stringify(sharedReqs));
+  // Show confirmation
+  var confirmMsg='<div style="text-align:left;font-size:12px;line-height:1.8;">';
+  confirmMsg+='<strong>Unit:</strong> '+esc(req.unitRequesting)+'<br>';
+  confirmMsg+='<strong>POC:</strong> '+esc(req.pocName)+' ('+esc(req.pocEmail)+')<br>';
+  confirmMsg+='<strong>Op Dates:</strong> '+(req.opFrom||'?')+' to '+(req.opTo||'?')+'<br>';
+  confirmMsg+='<strong>Airfield:</strong> '+esc(req.airfield||'')+'<br>';
+  confirmMsg+='<strong>Chutes:</strong> '+esc(req.paraType)+'<br>';
+  confirmMsg+='<strong>Reserves:</strong> '+(req.reserves||'0')+'<br>';
+  confirmMsg+='<strong>Pickup:</strong> '+(req.pickupDate||'?')+'<br>';
+  confirmMsg+='<strong>Return:</strong> '+(req.returnDate||'?')+'<br>';
+  confirmMsg+='</div>';
+  confirmMsg+='<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Is all information correct?</div>';
   
-  // Also save to current unit if logged in
-  if(currentUser){
-    if(!S.paraRequests) S.paraRequests=[];
-    S.paraRequests.unshift(req);
-    save();
-  }
-  
-  toast('Request submitted successfully! An admin will review it.','success',5000);
+  showConfirm('Confirm Request',confirmMsg,
+    [{label:'Go Back',cls:'btn-secondary',fn:function(){}},
+     {label:'Submit Request',cls:'btn-primary',fn:function(){
+       var sharedReqs=JSON.parse(localStorage.getItem('pms_shared_requests')||'[]');
+       sharedReqs.unshift(req);
+       localStorage.setItem('pms_shared_requests',JSON.stringify(sharedReqs));
+       if(currentUser){
+         if(!S.paraRequests) S.paraRequests=[];
+         S.paraRequests.unshift(req);
+         save();
+         try{renderHome();}catch(e){}
+       }
+       toast('Request submitted! An admin will review it.','success',5000);
+     }}]);
   }catch(e){alert('Submit error: '+e.message);}
 }
 
