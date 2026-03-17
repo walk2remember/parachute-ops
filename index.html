@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#6366f1">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -396,7 +397,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.17.4</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.17.5</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -7785,6 +7786,8 @@ function submitParaRequest(){
     save();
     try{renderHome();}catch(e){}
   }
+  // Send email notification to admins
+  try{notifyAdminsNewRequest(req);}catch(e){}
   window._pendingRequest=null;
   }catch(e){alert('Submit error: '+e.message);}
 }
@@ -7859,6 +7862,8 @@ function updateRequestStatus(ridx,status){
   
   save();
   auditLog('request','Request '+status,'Request from '+req.unitRequesting+' '+status+' by '+(currentUser?currentUser.name:''));
+  // Send email to requestor
+  try{notifyRequestorStatus(req);}catch(e){}
   try{renderRequests();}catch(e){}
   try{renderHome();}catch(e){}
   toast('Request '+status,'success');
@@ -7891,6 +7896,117 @@ function deleteRequest(ridx){
        try{renderHome();}catch(e){}
        toast('Request deleted','warning');
      }}]);
+}
+
+
+// ══ EMAIL NOTIFICATIONS (EmailJS) ══
+var emailConfig=JSON.parse(localStorage.getItem('pms_emailConfig')||'{}');
+
+function showEmailConfig(){
+  var cfg=emailConfig;
+  var is='background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:6px 10px;font-size:12px;font-family:inherit;outline:none;width:100%;';
+  var html='<div style="text-align:left;">';
+  html+='<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Set up EmailJS to send notifications. Free at emailjs.com (200 emails/month).</div>';
+  html+='<div class="form-group"><label class="form-label">EmailJS Public Key</label><input type="text" class="form-input" id="ejPublicKey" value="'+(cfg.publicKey||'')+'" placeholder="e.g. aBcDeFgHiJkLm" style="'+is+'"></div>';
+  html+='<div class="form-group"><label class="form-label">Service ID</label><input type="text" class="form-input" id="ejServiceId" value="'+(cfg.serviceId||'')+'" placeholder="e.g. service_abc123" style="'+is+'"></div>';
+  html+='<div class="form-group"><label class="form-label">New Request Template ID</label><input type="text" class="form-input" id="ejRequestTemplate" value="'+(cfg.requestTemplate||'')+'" placeholder="e.g. template_xyz789" style="'+is+'"></div>';
+  html+='<div class="form-group"><label class="form-label">Status Update Template ID</label><input type="text" class="form-input" id="ejStatusTemplate" value="'+(cfg.statusTemplate||'')+'" placeholder="e.g. template_abc456" style="'+is+'"></div>';
+  html+='<div style="margin-top:8px;padding:8px;background:var(--bg-input);border-radius:6px;font-size:11px;color:var(--text-muted);">';
+  html+='<strong>Template variables to use:</strong><br>';
+  html+='New Request: {{unit}}, {{poc_name}}, {{poc_email}}, {{poc_phone}}, {{summary}}, {{to_email}}<br>';
+  html+='Status Update: {{unit}}, {{status}}, {{remarks}}, {{summary}}, {{to_email}}';
+  html+='</div>';
+  html+='</div>';
+  
+  showConfirm('Email Settings',html,
+    [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
+     {label:'Test Email',cls:'btn-secondary',fn:function(){
+       saveEmailConfig();
+       testEmail();
+     }},
+     {label:'Save',cls:'btn-primary',fn:function(){
+       saveEmailConfig();
+       toast('Email settings saved','success');
+     }}]);
+}
+
+function saveEmailConfig(){
+  emailConfig={
+    publicKey:(document.getElementById('ejPublicKey')||{}).value||'',
+    serviceId:(document.getElementById('ejServiceId')||{}).value||'',
+    requestTemplate:(document.getElementById('ejRequestTemplate')||{}).value||'',
+    statusTemplate:(document.getElementById('ejStatusTemplate')||{}).value||''
+  };
+  localStorage.setItem('pms_emailConfig',JSON.stringify(emailConfig));
+}
+
+function isEmailReady(){
+  return emailConfig.publicKey&&emailConfig.serviceId;
+}
+
+function sendEmail(templateId, params){
+  if(!isEmailReady()){return Promise.resolve();}
+  if(typeof emailjs==='undefined'){console.log('EmailJS not loaded');return Promise.resolve();}
+  return emailjs.send(emailConfig.serviceId, templateId, params, emailConfig.publicKey)
+    .then(function(){console.log('Email sent');})
+    .catch(function(e){console.log('Email error:',e);});
+}
+
+function notifyAdminsNewRequest(req){
+  if(!isEmailReady()||!emailConfig.requestTemplate) return;
+  var summary='Unit: '+req.unitRequesting+'\nPOC: '+req.pocName+' / '+req.pocPhone+' / '+req.pocEmail;
+  summary+='\nOp Date: '+(req.opFrom||'')+'\nAirfield: '+(req.airfield||'')+'\nDZ: '+(req.dz||'');
+  summary+='\nChutes: '+(req.paraType||'')+'\nReturn: '+(req.returnDate||'');
+  summary+='\nPickup POC: '+(req.pickupPOC||'');
+  
+  // Send to all admins with email addresses
+  var users=getUsers();
+  users.forEach(function(u){
+    if((u.role==='admin'||u.role==='masteradmin')&&u.email){
+      sendEmail(emailConfig.requestTemplate,{
+        to_email:u.email,
+        unit:req.unitRequesting||'',
+        poc_name:req.pocName||'',
+        poc_email:req.pocEmail||'',
+        poc_phone:req.pocPhone||'',
+        summary:summary
+      });
+    }
+  });
+}
+
+function notifyRequestorStatus(req){
+  if(!isEmailReady()||!emailConfig.statusTemplate) return;
+  if(!req.pocEmail) return;
+  var summary='Unit: '+req.unitRequesting+'\nChutes: '+(req.paraType||'')+'\nOp Date: '+(req.opFrom||'');
+  summary+='\nStatus: '+req.status.toUpperCase();
+  if(req.adminRemarks) summary+='\nRemarks: '+req.adminRemarks;
+  
+  sendEmail(emailConfig.statusTemplate,{
+    to_email:req.pocEmail,
+    unit:req.unitRequesting||'',
+    status:req.status.toUpperCase(),
+    remarks:req.adminRemarks||'',
+    summary:summary
+  });
+}
+
+function testEmail(){
+  if(!isEmailReady()){toast('Enter EmailJS credentials first','error');return;}
+  var users=getUsers();
+  var adminEmail='';
+  users.forEach(function(u){if((u.role==='admin'||u.role==='masteradmin')&&u.email) adminEmail=u.email;});
+  if(!adminEmail){toast('No admin has an email set. Add one in the user table.','error');return;}
+  sendEmail(emailConfig.requestTemplate||emailConfig.statusTemplate,{
+    to_email:adminEmail,
+    unit:'TEST',
+    poc_name:'Test User',
+    poc_email:adminEmail,
+    poc_phone:'000-000-0000',
+    summary:'This is a test email from PMS.',
+    status:'TEST',
+    remarks:'Test notification'
+  }).then(function(){toast('Test email sent to '+adminEmail,'success');});
 }
 
 // ══ HELP / USER GUIDE ══
