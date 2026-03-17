@@ -397,7 +397,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.17.6</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.17.7</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -7801,6 +7801,9 @@ function submitParaRequest(){
   }
   // Send email notification to admins
   try{notifyAdminsNewRequest(req);}catch(e){}
+  // Notify admins via email
+  try{notifyAdminsNewRequest(req);}catch(e){}
+  
   window._pendingRequest=null;
   }catch(e){alert('Submit error: '+e.message);}
 }
@@ -7875,6 +7878,8 @@ function updateRequestStatus(ridx,status){
   
   save();
   auditLog('request','Request '+status,'Request from '+req.unitRequesting+' '+status+' by '+(currentUser?currentUser.name:''));
+  // Notify requestor via email
+  try{notifyRequestorStatus(req,status);}catch(e){}
   // Send email to requestor
   try{notifyRequestorStatus(req);}catch(e){}
   try{renderRequests();}catch(e){}
@@ -7894,6 +7899,7 @@ function negotiateRequest(ridx){
        req.reviewedAt=new Date().toISOString();
        save();
        auditLog('request','Request Negotiate','Negotiating with '+req.unitRequesting);
+       try{notifyRequestorStatus(req,'negotiate');}catch(e){}
        renderRequests();
        toast('Negotiate response sent','success');
      }}]);
@@ -8020,6 +8026,90 @@ function testEmail(){
     status:'TEST',
     remarks:'Test notification'
   }).then(function(){toast('Test email sent to '+adminEmail,'success');});
+}
+
+
+// ══ EMAIL NOTIFICATIONS (Resend) ══
+var RESEND_API_KEY='re_UbustvEt_ApW688HLUFv7eJR8aSxmdC7J';
+
+async function sendEmail(to, subject, htmlBody){
+  if(!to||!subject) return;
+  try{
+    var response=await fetch('https://api.resend.com/emails',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+RESEND_API_KEY
+      },
+      body:JSON.stringify({
+        from:'PMS Alerts <onboarding@resend.dev>',
+        to:Array.isArray(to)?to:[to],
+        subject:subject,
+        html:htmlBody
+      })
+    });
+    var data=await response.json();
+    if(response.ok){
+      console.log('Email sent:',data.id);
+      return true;
+    } else {
+      console.log('Email error:',data);
+      return false;
+    }
+  }catch(e){
+    console.log('Email failed:',e.message);
+    return false;
+  }
+}
+
+function getAdminEmails(){
+  var users=getUsers();
+  var emails=[];
+  users.forEach(function(u){
+    if((u.role==='admin'||u.role==='masteradmin')&&u.email){
+      emails.push(u.email.trim());
+    }
+  });
+  return emails.filter(function(e){return e.includes('@');});
+}
+
+async function notifyAdminsNewRequest(req){
+  var emails=getAdminEmails();
+  if(emails.length===0) return;
+  var subject='New Parachute Request from '+(req.unitRequesting||'Unknown');
+  var html='<h2>New Parachute Request</h2>';
+  html+='<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Unit</td><td style="padding:4px 12px;font-weight:bold;">'+(req.unitRequesting||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">POC</td><td style="padding:4px 12px;">'+(req.pocName||'')+' / '+(req.pocPhone||'')+' / '+(req.pocEmail||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Op Date</td><td style="padding:4px 12px;">'+(req.opFrom||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Airfield</td><td style="padding:4px 12px;">'+(req.airfield||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">DZ</td><td style="padding:4px 12px;">'+(req.dz||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Chutes</td><td style="padding:4px 12px;font-weight:bold;">'+(req.paraType||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Reserves</td><td style="padding:4px 12px;">'+(req.reserves||'0')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Pickup</td><td style="padding:4px 12px;">'+(req.pickupDate||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Return</td><td style="padding:4px 12px;">'+(req.returnDate||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Pickup POC</td><td style="padding:4px 12px;">'+(req.pickupPOC||'')+'</td></tr>';
+  html+='</table>';
+  html+='<p style="margin-top:16px;color:#666;font-size:13px;">Log in to PMS to approve, deny, or negotiate this request.</p>';
+  
+  await sendEmail(emails, subject, html);
+}
+
+async function notifyRequestorStatus(req, status){
+  if(!req.pocEmail) return;
+  var statusText=status==='approved'?'APPROVED':status==='disapproved'?'DENIED':'NEEDS NEGOTIATION';
+  var subject='Parachute Request '+statusText+' - '+(req.unitRequesting||'');
+  var html='<h2>Parachute Request '+statusText+'</h2>';
+  html+='<p>Your parachute request for <strong>'+(req.paraType||'')+'</strong> has been <strong>'+statusText+'</strong>.</p>';
+  if(req.adminRemarks) html+='<p><strong>Remarks:</strong> '+req.adminRemarks+'</p>';
+  html+='<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Unit</td><td style="padding:4px 12px;">'+(req.unitRequesting||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Chutes</td><td style="padding:4px 12px;">'+(req.paraType||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Op Date</td><td style="padding:4px 12px;">'+(req.opFrom||'')+'</td></tr>';
+  html+='<tr><td style="padding:4px 12px;color:#666;">Reviewed By</td><td style="padding:4px 12px;">'+(req.reviewedBy||'')+'</td></tr>';
+  html+='</table>';
+  
+  await sendEmail(req.pocEmail, subject, html);
 }
 
 // ══ HELP / USER GUIDE ══
