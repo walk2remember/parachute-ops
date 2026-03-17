@@ -397,7 +397,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.17.5</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.17.6</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -489,6 +489,7 @@
   <div id="page-weekly" style="display:none;">
     <div class="page-header">
       <h1 class="page-title">Weekly Data Report</h1>
+      <button class="btn btn-danger btn-sm" onclick="clearWeeklyData()">Clear Weekly Data</button>
       <button class="btn btn-secondary" onclick="printWeeklyReport()">🖨 Print Report</button>
     </div>
     <div id="weeklyContent"></div>
@@ -5111,6 +5112,18 @@ function getWeekRange(date){
 
 function fmtWeekDate(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
 
+
+function clearWeeklyData(){
+  showConfirm('Clear Weekly Data','Clear all weekly report data?',
+    [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
+     {label:'Clear',cls:'btn-danger',fn:function(){
+       S.weeklyNotes={};
+       if(S.signedOut) S.signedOut=S.signedOut.filter(function(s){return !s._requestId;});
+       save();
+       renderWeekly();
+       toast('Weekly data cleared','success');
+     }}]);
+}
 function renderWeekly(){
   const c=document.getElementById('weeklyContent');
   if(!c) return;
@@ -7058,8 +7071,8 @@ function renderInventory(){
     var sysOpts=['T-11','MC-6','RA-1','T-11R','MC-6R','RA-1R','AEBP','MAWC',''].map(function(s){return '<option value="'+s+'"'+(s===(item.systemType||'')?'selected':'')+'>'+(s||'--')+'</option>';}).join('');
     html+='<td><select style="background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);padding:2px 4px;font-size:10px;outline:none;" onchange="updateInventoryField(\''+esc(sn)+'\',\'systemType\',this.value)">'+sysOpts+'</select></td>';
     html+='<td style="font-weight:600;cursor:pointer;color:var(--accent);" onclick="showChuteHistory(\''+esc(sn)+'\')" title="Click for history">'+esc(sn)+'</td>';
-    html+='<td><input type="text" value="'+esc(item.dom||'')+'" style="background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);padding:2px 5px;font-size:11px;width:65px;outline:none;" onchange="updateInventoryField(\''+esc(sn)+'\',\'dom\',this.value)"></td>';
-    html+='<td><input type="text" value="'+esc(item.pis||'')+'" style="background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);padding:2px 5px;font-size:11px;width:65px;outline:none;" onchange="updateInventoryField(\''+esc(sn)+'\',\'pis\',this.value)"></td>';
+    html+='<td style="font-size:11px;">'+(item.dom||'\u2014')+'</td>';
+    html+='<td style="font-size:11px;">'+(item.pis||'\u2014')+'</td>';
     html+='<td style="font-size:11px;">'+(item.osd||'\u2014')+'</td>';
     html+='<td style="font-size:11px;color:var(--text-muted);">'+location+'</td>';
     html+='<td><button class="row-action-btn delete" onclick="deleteInventoryItem(\''+esc(sn)+'\')">\u2715</button></td>';
