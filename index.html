@@ -396,7 +396,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.16.6</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.16.7</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -7731,33 +7731,16 @@ function submitParaRequest(){
     adminRemarks:''
   };
   
-  // Show confirmation
-  var confirmMsg='<div style="text-align:left;font-size:12px;line-height:1.8;">';
-  confirmMsg+='<strong>Unit:</strong> '+esc(req.unitRequesting)+'<br>';
-  confirmMsg+='<strong>POC:</strong> '+esc(req.pocName)+' ('+esc(req.pocEmail)+')<br>';
-  confirmMsg+='<strong>Op Dates:</strong> '+(req.opFrom||'?')+' to '+(req.opTo||'?')+'<br>';
-  confirmMsg+='<strong>Airfield:</strong> '+esc(req.airfield||'')+'<br>';
-  confirmMsg+='<strong>Chutes:</strong> '+esc(req.paraType)+'<br>';
-  confirmMsg+='<strong>Reserves:</strong> '+(req.reserves||'0')+'<br>';
-  confirmMsg+='<strong>Pickup:</strong> '+(req.pickupDate||'?')+'<br>';
-  confirmMsg+='<strong>Return:</strong> '+(req.returnDate||'?')+'<br>';
-  confirmMsg+='</div>';
-  confirmMsg+='<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Is all information correct?</div>';
-  
-  showConfirm('Confirm Request',confirmMsg,
-    [{label:'Go Back',cls:'btn-secondary',fn:function(){}},
-     {label:'Submit Request',cls:'btn-primary',fn:function(){
-       var sharedReqs=JSON.parse(localStorage.getItem('pms_shared_requests')||'[]');
-       sharedReqs.unshift(req);
-       localStorage.setItem('pms_shared_requests',JSON.stringify(sharedReqs));
-       if(currentUser){
-         if(!S.paraRequests) S.paraRequests=[];
-         S.paraRequests.unshift(req);
-         save();
-         try{renderHome();}catch(e){}
-       }
-       toast('Request submitted! An admin will review it.','success',5000);
-     }}]);
+  // Save request directly
+  var sharedReqs=JSON.parse(localStorage.getItem('pms_shared_requests')||'[]');
+  sharedReqs.unshift(req);
+  localStorage.setItem('pms_shared_requests',JSON.stringify(sharedReqs));
+  if(currentUser){
+    if(!S.paraRequests) S.paraRequests=[];
+    S.paraRequests.unshift(req);
+    save();
+    try{renderHome();}catch(e){}
+  }
   }catch(e){alert('Submit error: '+e.message);}
 }
 
