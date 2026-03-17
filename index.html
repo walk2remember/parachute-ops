@@ -396,7 +396,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.17.3</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.17.4</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -5327,11 +5327,12 @@ function printWeeklyReport(){
 
 // ══ CSV UPLOAD ══
 let csvUploads=JSON.parse(localStorage.getItem('csvUploads')||'{}');
+if(S.csvUploads&&Object.keys(S.csvUploads).length>0&&Object.keys(csvUploads).length===0){csvUploads=S.csvUploads;saveCSVUploads();}
 let csvParsedData=null;
 let csvColumnMap={};
 let csvCurrentView=null;
 
-function saveCSVUploads(){ localStorage.setItem('csvUploads',JSON.stringify(csvUploads)); }
+function saveCSVUploads(){ localStorage.setItem('csvUploads',JSON.stringify(csvUploads)); S.csvUploads=csvUploads; save(); }
 
 function renderCSVUpload(){
   const c=document.getElementById('csvContent');
