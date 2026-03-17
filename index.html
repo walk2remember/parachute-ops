@@ -396,7 +396,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.16.3</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.16.4</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -1787,7 +1787,6 @@ function doLogin(){
   updateUserDisplay();
   // Merge any shared requests submitted from login page
   var sharedReqs=JSON.parse(localStorage.getItem('pms_shared_requests')||'[]');
-  alert('LOGIN: shared requests found: '+sharedReqs.length+', S.paraRequests: '+(S.paraRequests?S.paraRequests.length:'undefined'));
   if(sharedReqs.length>0){
     if(!S.paraRequests) S.paraRequests=[];
     sharedReqs.forEach(function(sr){
@@ -7557,9 +7556,21 @@ function newParaRequest(){
   
   html+='</div>';
   
-  showConfirm('New Parachute Request', html,
-    [{label:'Cancel',cls:'btn-secondary',fn:function(){}},
-     {label:'Submit Request',cls:'btn-primary',fn:function(){submitParaRequest();}}]);
+  // Create standalone modal (not showConfirm, which auto-closes and kills DOM)
+  var overlay=document.createElement('div');
+  overlay.id='requestFormOverlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:center;justify-content:center;';
+  var dialog=document.createElement('div');
+  dialog.className='confirm-dialog';
+  dialog.style.cssText='background:var(--bg-card);border-radius:12px;padding:20px;max-width:700px;width:95%;max-height:90vh;overflow-y:auto;';
+  dialog.innerHTML='<div class="confirm-title">New Parachute Request</div><div class="confirm-message">'+html+'</div><div class="confirm-actions"><button class="btn btn-secondary" id="rqCancelBtn">Cancel</button><button class="btn btn-primary" id="rqSubmitBtn">Submit Request</button></div>';
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+  document.getElementById('rqCancelBtn').addEventListener('click',function(){overlay.remove();});
+  document.getElementById('rqSubmitBtn').addEventListener('click',function(){
+    submitParaRequest();
+    overlay.remove();
+  });
 }
 
 
@@ -7600,7 +7611,6 @@ function submitParaRequest(){
     var q=el.querySelector('.rqParaQty');
     if(t&&q&&q.value) paraLines.push({type:t.value,qty:q.value});
   });
-  alert('paraLines found: '+paraLines.length);
   if(paraLines.length===0){toast('Add at least one chute type with quantity','error');return;}
   var paraSummary=paraLines.map(function(p){return p.type+' x'+p.qty;}).join(', ');
   var totalParaQty=paraLines.reduce(function(s,p){return s+parseInt(p.qty||0);},0);
@@ -7610,46 +7620,46 @@ function submitParaRequest(){
     status:'pending',
     submittedBy:currentUser?currentUser.name:'',
     submittedAt:new Date().toISOString(),
-    unitRequesting:unit==='Other'?(document.getElementById('rqUnitOther').value.trim()||'Other'):unit,
+    unitRequesting:unit==='Other'?(((document.getElementById('rqUnitOther')||{}).value||'').trim()||'Other'):unit,
     pocName:pocName,
     pocEmail:pocEmail,
     pocPhone:pocPhone,
-    opFrom:document.getElementById('rqOpFrom').value,
-    opTo:document.getElementById('rqOpTo').value,
-    airfield:document.getElementById('rqAirfield').value.trim(),
-    dz:document.getElementById('rqDZ').value.trim(),
-    aircraftType:document.getElementById('rqAircraft').value,
-    aircraftQty:document.getElementById('rqAircraftQty').value,
-    inTrail:document.getElementById('rqInTrail').value,
-    malc:document.getElementById('rqMALC').value,
-    otherEquip:document.getElementById('rqOtherEquip').value.trim(),
+    opFrom:(document.getElementById('rqOpFrom')||{}).value||'',
+    opTo:(document.getElementById('rqOpTo')||{}).value||'',
+    airfield:((document.getElementById('rqAirfield')||{}).value||'').trim(),
+    dz:((document.getElementById('rqDZ')||{}).value||'').trim(),
+    aircraftType:(document.getElementById('rqAircraft')||{}).value||'',
+    aircraftQty:(document.getElementById('rqAircraftQty')||{}).value||'',
+    inTrail:(document.getElementById('rqInTrail')||{}).value||'',
+    malc:(document.getElementById('rqMALC')||{}).value||'',
+    otherEquip:((document.getElementById('rqOtherEquip')||{}).value||'').trim(),
     paraLines:paraLines,
     paraType:paraSummary,
     paraQty:String(totalParaQty),
-    reserves:document.getElementById('rqReserves').value,
-    aebp:document.getElementById('rqAEBP').value,
-    mawc:document.getElementById('rqMAWC').value,
-    mawcl:document.getElementById('rqMAWCL').value,
-    pickupDate:document.getElementById('rqPickup').value,
-    returnDate:document.getElementById('rqReturn').value,
-    vehicleType:document.getElementById('rqVehicle').value==='Other'?(document.getElementById('rqVehicleOther').value.trim()||'Other'):document.getElementById('rqVehicle').value,
-    pickupPOC:document.getElementById('rqPickupPOC').value.trim(),
-    pickupPhone:document.getElementById('rqPickupPhone').value.trim(),
-    airdropType:document.getElementById('rqAirdropType').value,
-    airdropQty:document.getElementById('rqAirdropQty').value,
-    mre:document.getElementById('rqMRE').value,
-    waterType:document.getElementById('rqWater').value,
-    ammoType:document.getElementById('rqAmmo').value,
-    airdropNotes:document.getElementById('rqAirdropNotes').value.trim(),
-    slingType:document.getElementById('rqSlingType').value,
-    slingQty:document.getElementById('rqSlingQty').value,
-    slingEquip:document.getElementById('rqSlingEquip').value.trim(),
-    slingAircraft:document.getElementById('rqSlingAircraft').value,
-    slingAircraftQty:document.getElementById('rqSlingAircraftQty').value,
-    aircraftPOC:document.getElementById('rqAircraftPOC').value.trim(),
-    aircraftPOCPhone:document.getElementById('rqAircraftPOCPhone').value.trim(),
-    specialTraining:document.getElementById('rqSpecialTraining').value==='Other'?(document.getElementById('rqSpecialOther').value.trim()||'Other'):document.getElementById('rqSpecialTraining').value,
-    remarks:document.getElementById('rqRemarks').value.trim(),
+    reserves:(document.getElementById('rqReserves')||{}).value||'',
+    aebp:(document.getElementById('rqAEBP')||{}).value||'',
+    mawc:(document.getElementById('rqMAWC')||{}).value||'',
+    mawcl:(document.getElementById('rqMAWCL')||{}).value||'',
+    pickupDate:(document.getElementById('rqPickup')||{}).value||'',
+    returnDate:(document.getElementById('rqReturn')||{}).value||'',
+    vehicleType:(document.getElementById('rqVehicle')||{}).value||''==='Other'?(((document.getElementById('rqVehicleOther')||{}).value||'').trim()||'Other'):(document.getElementById('rqVehicle')||{}).value||'',
+    pickupPOC:((document.getElementById('rqPickupPOC')||{}).value||'').trim(),
+    pickupPhone:((document.getElementById('rqPickupPhone')||{}).value||'').trim(),
+    airdropType:(document.getElementById('rqAirdropType')||{}).value||'',
+    airdropQty:(document.getElementById('rqAirdropQty')||{}).value||'',
+    mre:(document.getElementById('rqMRE')||{}).value||'',
+    waterType:(document.getElementById('rqWater')||{}).value||'',
+    ammoType:(document.getElementById('rqAmmo')||{}).value||'',
+    airdropNotes:((document.getElementById('rqAirdropNotes')||{}).value||'').trim(),
+    slingType:(document.getElementById('rqSlingType')||{}).value||'',
+    slingQty:(document.getElementById('rqSlingQty')||{}).value||'',
+    slingEquip:((document.getElementById('rqSlingEquip')||{}).value||'').trim(),
+    slingAircraft:(document.getElementById('rqSlingAircraft')||{}).value||'',
+    slingAircraftQty:(document.getElementById('rqSlingAircraftQty')||{}).value||'',
+    aircraftPOC:((document.getElementById('rqAircraftPOC')||{}).value||'').trim(),
+    aircraftPOCPhone:((document.getElementById('rqAircraftPOCPhone')||{}).value||'').trim(),
+    specialTraining:(document.getElementById('rqSpecialTraining')||{}).value||''==='Other'?(((document.getElementById('rqSpecialOther')||{}).value||'').trim()||'Other'):(document.getElementById('rqSpecialTraining')||{}).value||'',
+    remarks:((document.getElementById('rqRemarks')||{}).value||'').trim(),
     adminRemarks:''
   };
   
