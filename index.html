@@ -398,7 +398,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.18.3</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.18.5</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -7803,6 +7803,19 @@ function submitParaRequest(){
   }
   // Send email notification to admins
   try{notifyAdminsNewRequest(req);}catch(e){}
+  // Send confirmation to requestor
+  if(req.pocEmail){
+    try{
+      var confirmHtml='<h2>Parachute Request Received</h2>';
+      confirmHtml+='<p>Your request for <strong>'+(req.paraType||'')+'</strong> has been submitted and is pending admin review.</p>';
+      confirmHtml+='<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">';
+      confirmHtml+='<tr><td style="padding:4px 12px;color:#666;">Unit</td><td style="padding:4px 12px;">'+(req.unitRequesting||'')+'</td></tr>';
+      confirmHtml+='<tr><td style="padding:4px 12px;color:#666;">Chutes</td><td style="padding:4px 12px;">'+(req.paraType||'')+'</td></tr>';
+      confirmHtml+='<tr><td style="padding:4px 12px;color:#666;">Op Date</td><td style="padding:4px 12px;">'+(req.opFrom||'')+'</td></tr>';
+      confirmHtml+='</table>';
+      sendEmail(req.pocEmail,'Parachute Request Received - '+(req.unitRequesting||''),confirmHtml);
+    }catch(e){}
+  }
   
   window._pendingRequest=null;
   }catch(e){alert('Submit error: '+e.message);}
@@ -7880,8 +7893,6 @@ function updateRequestStatus(ridx,status){
   auditLog('request','Request '+status,'Request from '+req.unitRequesting+' '+status+' by '+(currentUser?currentUser.name:''));
   // Notify requestor via email
   try{notifyRequestorStatus(req,status);}catch(e){}
-  // Send email to requestor
-  try{notifyRequestorStatus(req);}catch(e){}
   try{renderRequests();}catch(e){}
   try{renderHome();}catch(e){}
   toast('Request '+status,'success');
@@ -8062,10 +8073,11 @@ function getAdminEmails(){
   var emails=[];
   users.forEach(function(u){
     if((u.role==='admin'||u.role==='masteradmin')&&u.email){
-      emails.push(u.email.trim());
+      var e=u.email.trim().toLowerCase();
+      if(e.includes('@')&&emails.indexOf(e)<0) emails.push(e);
     }
   });
-  return emails.filter(function(e){return e.includes('@');});
+  return emails;
 }
 
 async function notifyAdminsNewRequest(req){
