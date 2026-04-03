@@ -398,7 +398,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.19.3</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.19.4</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -462,7 +462,6 @@
       <h1 class="page-title">Rigger Pack Records</h1>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-secondary" onclick="importData()">📂 Import</button>
-        <button class="btn btn-secondary" onclick="generateBinBarcodes()">Print Bin Barcodes</button>
         <button class="btn btn-primary" id="btnAddSection">➕ Add Section</button>
       </div>
     </div>
@@ -2709,6 +2708,7 @@ function sectionHTML(sec){
         <span class="section-collapse-icon">▼</span>
         <span class="section-badge ${badge(sec.systemType)}">${sec.systemType}</span>
         <span class="section-title">${sec.binLocation}</span>
+        <button class="btn btn-secondary" style="padding:2px 6px;font-size:10px;margin-left:4px;" onclick="event.stopPropagation();openBarcodeScanner(function(code){handleBinScan(code,${sec.id})})" title="Scan into this bin">📷</button>
         <span class="section-meta">${rc} packed / ${totalRows} entries / ${sec.maxChutes} max</span>
         ${dateInfo}
       </div>
@@ -7338,6 +7338,46 @@ function quickScanEntry(secId){
 
 
 // ══ CHUTE HISTORY ══
+
+
+function handleBinScan(code,secId){
+  var sec=S.sections.find(function(s){return s.id===secId;});
+  if(!sec) return;
+  
+  // Check if code is a serial number
+  if(code){
+    // Check system type match
+    if(S.masterInventory[code]&&S.masterInventory[code].systemType){
+      if(S.masterInventory[code].systemType!==sec.systemType){
+        toast(code+' is '+S.masterInventory[code].systemType+', this bin is '+sec.systemType,'error',4000);
+        return;
+      }
+    }
+    // Check duplicates
+    var dupe=false;
+    S.sections.forEach(function(s){s.rows.forEach(function(r){if(r.serialNumber===code) dupe=true;});});
+    if(dupe){toast(code+' already exists in a section','error');return;}
+    if(sec.rows.length>=sec.maxChutes){toast('Bin full ('+sec.maxChutes+' max)','warning');return;}
+    
+    // Add to section
+    var row={serialNumber:code,dom:'',pis:'',osd:'',dbag:'',packer:'',ip:'',packDate:new Date().toISOString().split('T')[0],expirationDate:''};
+    if(S.masterInventory[code]){
+      row.dom=S.masterInventory[code].dom||'';
+      row.pis=S.masterInventory[code].pis||'';
+      row.osd=calcOSDString(row.dom,row.pis);
+    } else {
+      S.masterInventory[code]={dom:'',pis:'',osd:''};
+    }
+    var days=CFG[sec.systemType]?CFG[sec.systemType].expDays:182;
+    var exp=new Date();exp.setDate(exp.getDate()+days);
+    row.expirationDate=exp.toISOString().split('T')[0];
+    
+    sec.rows.push(row);
+    save();
+    renderSections();
+    toast(code+' added to '+sec.binLocation,'success',2000);
+  }
+}
 
 function showBinContents(secId){
   var sec=S.sections.find(function(s){return s.id===secId;});
