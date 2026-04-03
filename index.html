@@ -398,7 +398,7 @@
   <div class="login-box" id="loginPanel">
     <h2>Parachute Management System</h2>
     <div class="subtitle">"I will be sure always"</div>
-    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.19.1</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;">v3.19.2</div>
     <input type="text" id="loginUser" class="form-input" placeholder="Enter last name" style="margin-bottom:12px;" list="loginUserList" autocomplete="off">
     <datalist id="loginUserList"></datalist>
     <input type="password" id="loginPin" class="form-input" placeholder="Enter PIN" maxlength="10" style="text-align:center;font-size:18px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')doLogin()">
@@ -3791,7 +3791,7 @@ function saveUnitInfo(){
 const FACILITY_CONFIGS={
   personnel:{
     label:'Personnel Parachutes',
-    systems:['T-11','T-11R','T-11R SP','MC-6','RA-1','RA-1R','AEBP'],
+    systems:['T-11','T-11R','T-11R SP','MC-6','RA-1','RA-1R','RA-1 DBSL','AEBP'],
     defaultMax:{default:56,'MC-6':72},
     statusDefault:['Popped','Maintenance']
   },
@@ -3815,9 +3815,9 @@ const FACILITY_CONFIGS={
   },
   mff:{
     label:'Military Free Fall',
-    systems:['RA-1 MFF'],
+    systems:['RA-1','RA-1R','RA-1 DBSL','MC-6','Cypress AAD','Altimeter'],
     defaultMax:{default:30},
-    statusDefault:['Popped','Maintenance']
+    statusDefault:['Popped','Maintenance','Expired']
   }
 };
 
@@ -4644,18 +4644,66 @@ function renderPSR(){
   html+=`<div style="display:grid;grid-template-columns:${hasExpiring?'1fr 1fr':'1fr'};gap:16px;">`;
 
   // Availability Calculation
+  // Per-system availability
+  var sysList=['T-11','MC-6','RA-1'];
+  var sysAvail={};
+  sysList.forEach(function(sys){
+    var packed=0,expiring=0,signedOut=0,maint=0;
+    S.sections.forEach(function(sec){
+      if(sec.systemType!==sys) return;
+      sec.rows.forEach(function(r){
+        if(r.serialNumber&&r.packer&&r.ip&&!r._signedOut&&!r._popped) packed++;
+        if(r.expirationDate){
+          var d=new Date(r.expirationDate);
+          var days=(d-new Date())/(1000*60*60*24);
+          if(days<=182&&!r._signedOut&&!r._popped) expiring++;
+        }
+      });
+    });
+    (S.signedOut||[]).forEach(function(so){
+      if(!so._requestId&&(so.system===sys||(so.system||'').includes(sys))){
+        signedOut+=parseInt(so.count)||0;
+      }
+    });
+    sysAvail[sys]={packed:packed,expiring:expiring,signedOut:signedOut,available:packed-expiring-signedOut};
+  });
+  
   html+=`<div>
     <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px;">Availability Calculation</div>
-    <table class="psr-table"><tbody>
-      <tr><td>Total Chutes Packed</td><td style="text-align:right;"><strong>${totalChutes}</strong></td></tr>
-      <tr><td>− Expiring (6 months)</td><td style="text-align:right;" class="exp-30">−${totalExpiringAll}</td></tr>
-      <tr><td>− Signed Out</td><td style="text-align:right;">−${totalSignedOut}</td></tr>
-      <tr><td>− In Maintenance</td><td style="text-align:right;">−${totalMaint}</td></tr>
-      <tr style="border-top:2px solid var(--border);"><td><strong>Available Chutes</strong></td><td style="text-align:right;"><strong class="${availableChutes<0?'exp-expired':''}">${availableChutes}</strong></td></tr>
-      <tr><td>− Requested for Ops</td><td style="text-align:right;">−${totalRequested}</td></tr>
-      <tr style="border-top:2px solid var(--border);"><td><strong>${surplus>=0?'Surplus':'Shortfall'}</strong></td><td style="text-align:right;"><strong class="${surplus<0?'exp-expired':'exp-ok'}">${surplus>=0?'+':''}${surplus}</strong></td></tr>
-    </tbody></table>
-  </div>`;
+    <table class="psr-table"><thead><tr><th></th>`;
+  sysList.forEach(function(sys){html+=`<th style="text-align:right;">${sys}</th>`;});
+  html+=`<th style="text-align:right;">TOTAL</th></tr></thead><tbody>`;
+  
+  // Packed row
+  html+='<tr><td>Packed</td>';
+  var totalP=0;
+  sysList.forEach(function(sys){totalP+=sysAvail[sys].packed;html+='<td style="text-align:right;"><strong>'+sysAvail[sys].packed+'</strong></td>';});
+  html+='<td style="text-align:right;"><strong>'+totalP+'</strong></td></tr>';
+  
+  // Expiring row
+  html+='<tr><td>Expiring (6mo)</td>';
+  var totalE=0;
+  sysList.forEach(function(sys){totalE+=sysAvail[sys].expiring;html+='<td style="text-align:right;" class="exp-30">'+sysAvail[sys].expiring+'</td>';});
+  html+='<td style="text-align:right;" class="exp-30">'+totalE+'</td></tr>';
+  
+  // Signed Out row
+  html+='<tr><td>Signed Out</td>';
+  var totalSO=0;
+  sysList.forEach(function(sys){totalSO+=sysAvail[sys].signedOut;html+='<td style="text-align:right;">'+sysAvail[sys].signedOut+'</td>';});
+  html+='<td style="text-align:right;">'+totalSO+'</td></tr>';
+  
+  // Available row
+  html+='<tr style="border-top:2px solid var(--border);"><td><strong>Available</strong></td>';
+  var totalA=0;
+  sysList.forEach(function(sys){
+    var a=sysAvail[sys].available;
+    totalA+=a;
+    html+='<td style="text-align:right;"><strong class="'+(a<0?'exp-expired':'')+'">'+a+'</strong></td>';
+  });
+  html+='<td style="text-align:right;"><strong class="'+(totalA<0?'exp-expired':'')+'">'+totalA+'</strong></td></tr>';
+  
+  html+=`</tbody></table>
+  </div>\``;
 
   // Expiring chutes - only show if there are any
   if(hasExpiring){
@@ -7289,6 +7337,53 @@ function quickScanEntry(secId){
 
 
 // ══ CHUTE HISTORY ══
+
+function showBinContents(secId){
+  var sec=S.sections.find(function(s){return s.id===secId;});
+  if(!sec) return;
+  var html='<div style="text-align:left;max-height:60vh;overflow-y:auto;">';
+  html+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">'+sec.systemType+' | '+sec.rows.length+' chutes</div>';
+  if(sec.rows.length===0){
+    html+='<div style="color:var(--text-muted);">Empty bin</div>';
+  } else {
+    html+='<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+    html+='<tr style="border-bottom:1px solid var(--border);"><th style="padding:4px;text-align:left;">S/N</th><th>DOM</th><th>PIS</th><th>Packer</th><th>Pack Date</th></tr>';
+    sec.rows.forEach(function(r){
+      html+='<tr style="border-bottom:1px solid var(--border);">';
+      html+='<td style="padding:4px;font-weight:600;">'+esc(r.serialNumber||'')+'</td>';
+      html+='<td style="padding:4px;">'+esc(r.dom||'')+'</td>';
+      html+='<td style="padding:4px;">'+esc(r.pis||'')+'</td>';
+      html+='<td style="padding:4px;">'+esc(r.packer||'')+'</td>';
+      html+='<td style="padding:4px;">'+esc(r.packDate||'')+'</td>';
+      html+='</tr>';
+    });
+    html+='</table>';
+  }
+  html+='</div>';
+  showConfirm('Bin: '+esc(sec.binLocation),html,[{label:'Close',cls:'btn-secondary',fn:function(){}}]);
+}
+
+function generateBinBarcodes(){
+  if(!S.sections||S.sections.length===0){toast('No sections to generate barcodes for','warning');return;}
+  var body='<div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;">';
+  S.sections.forEach(function(sec){
+    body+='<div style="text-align:center;padding:12px;border:1px solid #ccc;border-radius:8px;width:200px;">';
+    body+='<svg id="binbc-'+sec.id+'"></svg>';
+    body+='<div style="font-size:12px;font-weight:600;margin-top:4px;">'+esc(sec.binLocation)+' ('+esc(sec.systemType)+')</div>';
+    body+='</div>';
+  });
+  body+='</div>';
+  openPrintPreview('Bin Location Barcodes',body);
+  setTimeout(function(){
+    S.sections.forEach(function(sec){
+      var el=document.getElementById('binbc-'+sec.id);
+      if(el&&typeof JsBarcode!=='undefined'){
+        JsBarcode(el,sec.binLocation,{format:'CODE128',width:2,height:50,fontSize:12,textMargin:2});
+      }
+    });
+  },300);
+}
+
 function showChuteHistory(sn){
   if(!sn){toast('No serial number','warning');return;}
   
@@ -8228,6 +8323,13 @@ function initQuaggaScanner(){
     if(navigator.vibrate) navigator.vibrate(100);
     
     var found=false;var location='';
+    // Check if scanned code is a bin location
+    var binMatch=S.sections.find(function(sec){return sec.binLocation===code;});
+    if(binMatch){
+      found=true;location='BIN: '+binMatch.binLocation+' ('+binMatch.systemType+') - '+binMatch.rows.length+' chutes';
+      // Show bin contents after a short delay
+      setTimeout(function(){showBinContents(binMatch.id);},500);
+    }
     S.sections.forEach(function(sec){sec.rows.forEach(function(r){
       if(r.serialNumber===code){found=true;location=sec.binLocation+' ('+sec.systemType+')';}
     });});
